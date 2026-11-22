@@ -25,7 +25,7 @@ SRCS=$(cd "$SRC" && find . -name '*.java' | sed 's|^\./||')
 "${J}javac" -nowarn -cp "$ASM" -d "$(w $B/tools)" "$(w $HERE/PatchZoom.java)" "$(w $HERE/VerifyZoom.java)"
 "${J}java" -cp "$(w $B/tools)$SEP$ASM" PatchZoom "$(w $STOCK_JAR)" "$(w $B/gate/local/tt/ZoomGate.class)" "$(w $B/out)"
 "${J}java" -cp "$(w $B/tools)$SEP$ASM" VerifyZoom "$(w $STOCK_JAR)" "$(w $B/out)"
-OURS=$(cd "$B/out" && find local de/audi/tghu/navi/app/cluster/TtRgi.class -name '*.class' | sed 's|\.class$||')
+OURS=$(cd "$B/out" && find local de/audi/tghu/navi/app/cluster/TtRgi.class de/audi/tghu/connectivity/hmi/evohighmmikombi/TtSettingsPage.class -name '*.class' | sed 's|\.class$||')
 python3 -I "$(w $HERE/checklib.py)" "$(w $B/out)" "$(w $JAVA_LIB)" $OURS
 python3 -I "$(w $HERE/mkjar.py)" "$(w $B/out)" "$(w $OUT/tt-zoom.jar)"
 rm -rf "$B"

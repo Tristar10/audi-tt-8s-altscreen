@@ -147,6 +147,56 @@ public final class PatchZoom implements Opcodes {
         System.out.println("patched " + cls + ".setViewSize (class version " + cn.version + ")");
     }
 
+    /**
+     * v63 settings page. AbstractScreenFactory (framework base of every app's screen factory):
+     *   getScreen(II): every return value goes through ScreenHook.created(screen, this, id, terminal)
+     *   getText(I):    s = ScreenHook.text(id); if (s != null) return s;   then the stock lookup
+     */
+    static void patchScreenFactory(String jar, String outdir) throws Exception {
+        String cls = "de/audi/atip/hmi/view/AbstractScreenFactory";
+        String screen = "de/audi/atip/hmi/view/Screen";
+        String hook = "local/tt/ScreenHook";
+        ClassNode cn = new ClassNode();
+        new ClassReader(read(jar, cls)).accept(cn, 0);
+        if (cn.version > V1_4) throw new IllegalStateException(cls + " version " + cn.version);
+        int screens = 0, texts = 0;
+        for (MethodNode m : cn.methods) {
+            if (m.name.equals("getScreen") && m.desc.equals("(II)L" + screen + ";")) {
+                if ((m.access & ACC_STATIC) != 0) throw new IllegalStateException("getScreen is static");
+                for (var insn : m.instructions.toArray()) {
+                    if (insn.getOpcode() != ARETURN) continue;
+                    InsnList post = new InsnList();
+                    post.add(new VarInsnNode(ALOAD, 0));
+                    post.add(new VarInsnNode(ILOAD, 1));
+                    post.add(new VarInsnNode(ILOAD, 2));
+                    post.add(new MethodInsnNode(INVOKESTATIC, hook, "created",
+                        "(Ljava/lang/Object;Ljava/lang/Object;II)Ljava/lang/Object;", false));
+                    post.add(new org.objectweb.asm.tree.TypeInsnNode(CHECKCAST, screen));
+                    m.instructions.insertBefore(insn, post);
+                    screens++;
+                }
+            } else if (m.name.equals("getText") && m.desc.equals("(I)Ljava/lang/String;")) {
+                if ((m.access & ACC_STATIC) != 0) throw new IllegalStateException("getText is static");
+                InsnList pre = new InsnList();
+                LabelNode stock = new LabelNode();
+                pre.add(new VarInsnNode(ILOAD, 1));
+                pre.add(new MethodInsnNode(INVOKESTATIC, hook, "text", "(I)Ljava/lang/String;", false));
+                pre.add(new InsnNode(DUP));
+                pre.add(new JumpInsnNode(IFNULL, stock));
+                pre.add(new InsnNode(ARETURN));
+                pre.add(stock);
+                pre.add(new InsnNode(POP));
+                m.instructions.insert(pre);
+                texts++;
+            }
+        }
+        if (screens != 1 || texts != 1) throw new IllegalStateException("expected one getScreen return and one getText(I), found " + screens + "/" + texts);
+        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        cn.accept(cw);
+        write(Path.of(outdir, cls + ".class"), cw.toByteArray());
+        System.out.println("patched " + cls + ".getScreen and getText (settings page hook, class version " + cn.version + ")");
+    }
+
     /** CombiBAPListener.setCombiService(service): RgdBus.combi(this, service); then the stock body. */
     static void patchCombiService(ClassNode cn) {
         int n = 0;
@@ -331,6 +381,7 @@ public final class PatchZoom implements Opcodes {
             { "updateRgDirectionToNextDestination", "(S)V", "direction" },
         });
         patchViewMode(args[0], args[2]);
+        patchScreenFactory(args[0], args[2]);
         patchSpy(args[0], args[2], "de/audi/tghu/navi/app/cluster/KOMOService", new String[][] {
             { "setRouteInfo", "([Lorg/dsi/ifc/komoview/RouteInfoElement;)V", "komoInfo" },
             { "setRouteInfoElement", "(Lorg/dsi/ifc/komoview/RouteInfoElement;)V", "komoElem" },
@@ -353,7 +404,8 @@ public final class PatchZoom implements Opcodes {
                 if (!p.toString().endsWith(".class") || p.getFileName().toString().startsWith("._")) continue;
                 ClassNode gate = new ClassNode();
                 new ClassReader(Files.readAllBytes(p)).accept(gate, ClassReader.SKIP_FRAMES);
-                if (!gate.name.startsWith("local/tt/") && !gate.name.equals("de/audi/tghu/navi/app/cluster/TtRgi"))
+                if (!gate.name.startsWith("local/tt/") && !gate.name.equals("de/audi/tghu/navi/app/cluster/TtRgi")
+                    && !gate.name.equals("de/audi/tghu/connectivity/hmi/evohighmmikombi/TtSettingsPage"))
                     throw new IllegalStateException("unexpected class " + gate.name);
                 if (gate.signature != null) throw new IllegalStateException(gate.name + " uses generics");
                 for (MethodNode m : gate.methods) {

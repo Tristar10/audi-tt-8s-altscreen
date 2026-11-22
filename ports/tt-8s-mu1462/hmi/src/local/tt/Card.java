@@ -99,6 +99,64 @@ public final class Card {
         }
     }
 
+    /** v63 settings page: 0 off (map only), 1 near turns, 2 always - the same files as sh tt.sh card off|auto|on. */
+    static int mode() {
+        if (AUTO.exists()) {
+            return 1;
+        }
+        if (FIXED.exists() && "base".equals(readMode())) {
+            return 2;
+        }
+        return 0;
+    }
+
+    static void setMode(int m) throws java.io.IOException {
+        synchronized (MODE) {
+            if (m == 1) {
+                FIXED.delete();
+                write(AUTO, "");
+                last = -1;
+            } else {
+                AUTO.delete();
+                write(FIXED, "");
+                int want = m == 2 ? 0 : 1;
+                write(MODE, want == 0 ? "base\n" : "map\n");
+                last = want;
+                lastSwitch = System.currentTimeMillis();
+                if (sessionReady()) {
+                    write(SHOW, "1\n");
+                    ZoomGate.mapReset("card setting");
+                }
+            }
+        }
+        if (m == 1) {
+            update(System.currentTimeMillis());
+        }
+        RgdBus.note(new StringBuffer("card: setting ").append(m == 0 ? "off" : m == 1 ? "near turns" : "always").toString());
+    }
+
+    private static String readMode() {
+        FileInputStream in = null;
+        try {
+            if (!MODE.exists()) {
+                return "";
+            }
+            in = new FileInputStream(MODE);
+            byte[] b = new byte[16];
+            int n = in.read(b);
+            return n > 0 ? new String(b, 0, n).trim() : "";
+        } catch (Throwable t) {
+            return "";
+        } finally {
+            try {
+                if (in != null) {
+                    in.close();
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
     private static boolean sessionReady() {
         FileInputStream in = null;
         try {

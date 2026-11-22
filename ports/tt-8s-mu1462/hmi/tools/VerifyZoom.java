@@ -33,7 +33,9 @@ public final class VerifyZoom {
             "local/tt/TtPanel.class",
             "local/tt/TurnSpec.class",
             "de/audi/tghu/navi/app/cluster/ClusterViewMode.class",
-            "de/audi/tghu/navi/app/cluster/KOMOService.class"
+            "de/audi/tghu/navi/app/cluster/KOMOService.class",
+            "de/audi/atip/hmi/view/AbstractScreenFactory.class",
+            "de/audi/tghu/connectivity/hmi/evohighmmikombi/TtSettingsPage.class"
         };
         // every class of ours as well, so a new one cannot slip past (v59)
         java.util.List<String> all = new java.util.ArrayList<>(java.util.Arrays.asList(classes));
