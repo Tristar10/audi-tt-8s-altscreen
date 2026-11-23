@@ -15,16 +15,18 @@ public final class TeleIcons {
     public static final int CLUTCH = 4;
     public static final int AWD = 5;
     public static final int TACH = 6;
-    public static final int COUNT = 7;
+    public static final int WIFI = 7;
+    public static final int COUNT = 8;
 
     // Shape ops. CAP x0 y0 x1 y1 r (thick line, round ends) | CIRC x y r | RECT x0 y0 x1 y1 |
-    // POLY n x0 y0 ... | CUT_CIRC x y r | CUT_RECT x0 y0 x1 y1
+    // POLY n x0 y0 ... | CUT_CIRC x y r | CUT_RECT x0 y0 x1 y1 | CUT_POLY n x0 y0 ...
     private static final float CAP = 0;
     private static final float CIRC = 1;
     private static final float RECT = 2;
     private static final float POLY = 3;
     private static final float CUT_CIRC = 4;
     private static final float CUT_RECT = 5;
+    private static final float CUT_POLY = 6;
 
     private static final float[][] ICONS = {
         // COOLANT: thermometer with scale marks, waves either side of the bulb
@@ -53,6 +55,11 @@ public final class TeleIcons {
         // TACH: dial arc with a needle
         {CIRC, 50, 58, 46, CUT_CIRC, 50, 58, 36, CUT_RECT, 0, 72, 100, 100,
             CAP, 50, 58, 74, 28, 5, CIRC, 50, 58, 9},
+        // WIFI: three arcs over a dot
+        {CIRC, 50, 84, 78, CUT_CIRC, 50, 84, 67, CIRC, 50, 84, 55, CUT_CIRC, 50, 84, 44,
+            CIRC, 50, 84, 32, CUT_CIRC, 50, 84, 21,
+            CUT_POLY, 4, 50, 84, 0, 34, 0, 100, 50, 100, CUT_POLY, 4, 50, 84, 100, 34, 100, 100, 50, 100,
+            CIRC, 50, 84, 10},
     };
 
     private TeleIcons() {
@@ -103,7 +110,7 @@ public final class TeleIcons {
             } else {
                 int n = (int) o[i + 1];
                 if (polyHit(o, i + 2, n, u, v))
-                    in = true;
+                    in = op == (int) POLY;
                 i += 2 + 2 * n;
             }
         }

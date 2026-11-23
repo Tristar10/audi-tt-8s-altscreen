@@ -9,8 +9,10 @@ package local.tt;
  * layout keeps clear of them.
  *  - Large (Classic) view, after the FL5 Civic Type R's +R screen: shift lights under the tab bar;
  *    a rev line that rises from the lower left and runs across the top, numbers under it; a red
- *    line across with a notch in the middle holding a big gear; rpm left of the notch, the active
- *    preset right of it, speed top right; telemetry in a grid at the bottom, one icon per value.
+ *    line across with a notch in the middle holding a big gear; rpm left of the notch, Haldex lock
+ *    right of it; the active preset in the pocket inside the rev line's bend (top left), speed top
+ *    right (the very top corners are covered by the cluster's frame); temperatures and link status
+ *    in a grid at the bottom, one icon per value.
  *  - Small (Sport) view: only the map area left of the big rev counter is ours: gear and engine
  *    temperatures, one icon per value.
  *
@@ -130,6 +132,8 @@ public final class TeleLayout {
     public int cursor;
     public String status;
     public int statusRgba = GREY;
+    /** Datagrams per second from OpenHaldex, -1 if unknown. */
+    public int rateHz = -1;
 
     // Output
     public int count;
@@ -241,12 +245,16 @@ public final class TeleLayout {
         int gc = !link ? GREY : limit && !blink ? RED : WHITE; // the notch carries the shift cue
         text(720, 186, 150, true, CENTER, gc, gear(), true);
 
-        // Left of the notch: rpm. Right of it: the active preset and its mode.
+        // Top-left pocket, inside the bend of the rev line: the active preset and its mode.
+        text(150, 208, 28, true, LEFT, link ? PRESET : GREY, presetName(), true);
+        text(154, 240, 16, false, LEFT, GREY, presetMode(), true);
+
+        // Left of the notch: rpm. Right of it: Haldex lock, big percent over a bar with target tick.
         icon(GRID_X0 + 14, 226, 36, TeleIcons.TACH, ICONC, true);
         text(NOTCH_X0 - 6, 216, 48, true, RIGHT, over ? RED : vc, ok(CH_RPM) ? Integer.toString(rpm) : "-", link);
         text(NOTCH_X0 - 6, 216, 34, true, RIGHT, AMBER, "NO LINK", !link);
-        text(NOTCH_X1 + 6, 214, 34, true, LEFT, link ? PRESET : GREY, presetName(), true);
-        text(NOTCH_X1 + 8, 256, 18, false, LEFT, GREY, presetMode(), true);
+        icon(NOTCH_X1 + 10, 226, 36, TeleIcons.AWD, ICONC, true);
+        hxBar(NOTCH_X1 + 10, 284, GRID_X1 - NOTCH_X1 - 16, 20, GRID_X1 - 6, 216, 48);
 
         // Telemetry grid: 3 columns x 2 rows, an icon and a value in each cell.
         int cw = (GRID_X1 - GRID_X0) / 3;
@@ -260,11 +268,22 @@ public final class TeleLayout {
             int yy = GRID_Y + row * GRID_ROW;
             tempCell(order[n], cx0 + 16, cx0 + cw - 16, yy, 36, 36, rpm);
         }
-        // Last cell: Haldex lock, bar with target tick and percent.
+        // Last cell: the link to OpenHaldex, datagrams per second.
         int cx0 = GRID_X0 + 2 * cw;
         int yy = GRID_Y + GRID_ROW;
-        icon(cx0 + 16, yy, 36, TeleIcons.AWD, ICONC, true);
-        hxBar(cx0 + 62, yy + 8, cw - 62 - 92, 20, cx0 + cw - 16, 32);
+        boolean slow = link && rateHz >= 0 && rateHz < 10;
+        icon(cx0 + 16, yy, 36, TeleIcons.WIFI, link && !slow ? ICONC : AMBER, true);
+        text(cx0 + cw - 16, yy, 36, true, RIGHT, link && !slow ? WHITE : AMBER, linkText(), true);
+    }
+
+    private String linkText() {
+        if (!link)
+            return "NO LINK";
+        if (rateHz < 0)
+            return "OK";
+        StringBuffer sb = new StringBuffer();
+        sb.append(rateHz).append(" Hz");
+        return sb.toString();
     }
 
     private void liveSmall() {
@@ -301,14 +320,14 @@ public final class TeleLayout {
         text(x1, yy + (is - vs) / 2, vs, true, RIGHT, c, v, true);
     }
 
-    private void hxBar(int x0, int y0, int bw, int bh, int rx, int ps) {
+    /** Haldex lock bar with target tick at (x0, y0); actual percent right-aligned at (rx, ry). */
+    private void hxBar(int x0, int y0, int bw, int bh, int rx, int ry, int ps) {
         int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
         int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
         box(x0, y0, bw, bh, DIM, true);
         box(x0, y0, bw * act / 100, bh, link ? HALDEX : GREY, act > 0);
         box(x0 + bw * tgt / 100 - 2, y0 - 4, 4, bh + 8, WHITE, ok(CH_HX_TARGET));
-        text(rx, y0 + (bh - ps) / 2, ps, true, RIGHT, link ? WHITE : GREY,
-            ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
+        text(rx, ry, ps, true, RIGHT, link ? WHITE : GREY, ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
     }
 
     private void presets(boolean large) {

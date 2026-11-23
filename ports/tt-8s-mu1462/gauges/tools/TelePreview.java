@@ -99,6 +99,7 @@ public class TelePreview {
     private static TeleLayout base() {
         TeleLayout t = new TeleLayout();
         t.link = true;
+        t.rateHz = 20;
         set(t, TeleLayout.CH_COOLANT, 92);
         set(t, TeleLayout.CH_OIL, 98);
         set(t, TeleLayout.CH_IAT, 38);

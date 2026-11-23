@@ -195,9 +195,12 @@ wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker ru
     across under them, 24 px thick, 1..7 under it (white, amber in the last 1000 rpm before the shift point,
     all red from it, flashing at the limiter; red marks over the limiter range, red tick at the
     shift point). A red line across with a notch in the middle holding the gear; the notch glows
-    brighter from the shift point. Rpm left of the notch, the active preset and its mode right of
-    it, speed top right. A 3 x 2 telemetry grid at the bottom, one icon per value, no labels:
-    coolant, oil, intake, DSG, Haldex clutch temperature, Haldex lock bar with target tick.
+    brighter from the shift point. Rpm left of the notch; Haldex lock right of it (big percent over
+    a bar with the target tick). The very top corners of the screen are covered by the cluster's
+    frame, but two pockets below it are free: the active preset and its mode sit inside the bend of
+    the rev line (top left), speed top right. A 3 x 2 grid at the bottom, one icon per value, no
+    labels: coolant, oil, intake, DSG, Haldex clutch temperature, and the link (datagrams per
+    second, amber under 10 Hz, "NO LINK" when nothing arrives).
     Values turn amber or red out of range, blue when the oil is cold. No G-meter, no stopwatch.
   - Sport view: gear and the five temperatures with icons, in the map area left of the rev counter.
   - Defaults (user, 2026-11-23): shift 6500, limiter 6800, imperial.
