@@ -16,7 +16,9 @@ public final class TeleIcons {
     public static final int AWD = 5;
     public static final int TACH = 6;
     public static final int WIFI = 7;
-    public static final int COUNT = 8;
+    public static final int PEDAL = 8;
+    public static final int TURBO = 9;
+    public static final int COUNT = 10;
 
     // Shape ops. CAP x0 y0 x1 y1 r (thick line, round ends) | CIRC x y r | RECT x0 y0 x1 y1 |
     // POLY n x0 y0 ... | CUT_CIRC x y r | CUT_RECT x0 y0 x1 y1 | CUT_POLY n x0 y0 ...
@@ -60,6 +62,14 @@ public final class TeleIcons {
             CIRC, 50, 84, 32, CUT_CIRC, 50, 84, 21,
             CUT_POLY, 4, 50, 84, 0, 34, 0, 100, 50, 100, CUT_POLY, 4, 50, 84, 100, 34, 100, 100, 50, 100,
             CIRC, 50, 84, 10},
+        // PEDAL: slanted pedal pad with grooves, on its arm
+        {POLY, 4, 34, 8, 84, 8, 74, 66, 24, 66, CUT_POLY, 4, 33, 20, 80, 20, 79, 25, 32, 25,
+            CUT_POLY, 4, 31, 33, 78, 33, 77, 38, 30, 38, CUT_POLY, 4, 29, 46, 76, 46, 75, 51, 28, 51,
+            CAP, 48, 66, 38, 94, 6},
+        // TURBO: compressor housing (snail) with its outlet
+        {CIRC, 44, 58, 38, CUT_CIRC, 44, 58, 27, CIRC, 44, 58, 15, CUT_CIRC, 44, 58, 6,
+            RECT, 44, 16, 96, 38, CUT_RECT, 54, 24, 96, 31, CUT_CIRC, 44, 58, 27, CIRC, 44, 58, 15,
+            CUT_CIRC, 44, 58, 6},
     };
 
     private TeleIcons() {

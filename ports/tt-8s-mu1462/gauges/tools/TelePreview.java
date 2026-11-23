@@ -39,8 +39,8 @@ public class TelePreview {
         boolean masks = a.length > 3 && a[3].equals("masks");
         String[] caps = {
             "1  Classic view, autocross (FL5 +R style): cruising in 2nd, 20 Hz link",
-            "2  Classic view: shift lights coming on, oil hot (amber)",
-            "3  Classic view: past the shift point: lights flash blue, rev line red, notch glows",
+            "2  Classic view: full throttle, shift lights green then blue, oil hot (amber)",
+            "3  Classic view: past the shift point: everything flashes red (flash-on frame)",
             "4  Sport view, autocross: gear and temperatures (icons: coolant, oil, intake, DSG, Haldex clutch)",
             "5  Classic view, presets (later): wheel moves the cursor, press applies"};
         BufferedImage out = new BufferedImage(1440, caps.length * (540 + CAP), BufferedImage.TYPE_INT_RGB);
@@ -55,12 +55,16 @@ public class TelePreview {
         set(t, TeleLayout.CH_GEAR, 2);
         set(t, TeleLayout.CH_HX_TARGET, 40);
         set(t, TeleLayout.CH_HX_ACTUAL, 34);
+        set(t, TeleLayout.CH_PEDAL, 35);
+        set(t, TeleLayout.CH_BOOST, 30);
         panel(g, 0, large, t, TeleLayout.VIEW_LARGE, TeleLayout.PAGE_LIVE, caps[0], masks);
 
-        set(t, TeleLayout.CH_RPM, 5650);
+        set(t, TeleLayout.CH_RPM, 5950);
         set(t, TeleLayout.CH_HX_TARGET, 85);
         set(t, TeleLayout.CH_HX_ACTUAL, 80);
         set(t, TeleLayout.CH_OIL, 132);
+        set(t, TeleLayout.CH_PEDAL, 100);
+        set(t, TeleLayout.CH_BOOST, 125);
         panel(g, 1, large, t, TeleLayout.VIEW_LARGE, TeleLayout.PAGE_LIVE, caps[1], masks);
 
         set(t, TeleLayout.CH_RPM, 6620);

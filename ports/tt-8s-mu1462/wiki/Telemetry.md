@@ -190,23 +190,33 @@ wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker ru
   screen do not show). A slot cut by them is a collision.
   - The map is hidden by our own opaque full-screen layer; CarPlay keeps running underneath, so
     switching back is instant. Our turn panel hides while the autocross view shows.
-  - Classic view: 12 shift lights under the tab bar, slanted like the housing's slopes, lighting
-    from both ends towards the middle (green, amber, red over the last 1200 rpm, a soft glow behind
-    each lit one); from the shift point all flash **blue**, so "shift now" never looks like the red
-    zone. The rev line (24 px) is made of straight pieces that
-    follow the cluster housing: up along the frame's top-left edge, flat under the shift lights,
-    down along the top-right edge; 1..7 under it (white, amber in the last 1000 rpm before the
-    shift point, all red from it, flashing at the limiter; red marks over the limiter range, red
-    tick at the shift point; the numbers on the slopes tilt with them). The pockets above the two
-    slopes hold the active OpenHaldex preset and its mode (top left) and the link (top right: datagrams per second, amber under 10 Hz,
-    "NO LINK" when nothing arrives), both tilted along the slope. Tilted text and icons need EAL
-    `setRotationZ` on the car, untested (the dial sketch never calibrated degrees vs radians or the
-    sign); if it does not work they fall back to level. A red line across with a notch in the middle holding the
-    gear; the notch has two layers for depth and glows brighter from the shift point. Rpm left of the notch, Haldex lock right
-    of it (big percent over a bar with the target tick). The five temperatures in one row at the
-    bottom, one icon per value, no labels: coolant, oil, intake, DSG, Haldex clutch. Values turn
-    amber or red out of range, blue when the oil is cold. No speed (the stock speedometer shows
-    it), no G-meter, no stopwatch.
+  - Classic view (2026-11-23, fourth pass):
+    - Rev strip: straight pieces following the cluster housing, up the frame's top-left edge, flat,
+      down the top-right edge. The flat middle is the fattest part (44 px) and ends exactly at the
+      shift point; the slopes taper to 16 px. The scale has three parts: left slope 0-3000 rpm,
+      middle 3000 rpm to the shift point, right slope shift point to 7000 (the over-rev zone,
+      stretched so the limiter range reads clearly). Numbers sit inside the strip, dark on the lit
+      part. Dark track with hairline edges; lit from cool white warming to amber over the last
+      1500 rpm before the shift point, all red past it, flashing at the limiter; red marks over the
+      limiter range on the outer edge.
+    - Shift lights: 12 slanted lights above the strip, as wide as its fat middle, lighting from
+      both ends towards the middle: green, blue, red over the last 1200 rpm (a glow behind each lit
+      one). From the shift point all flash red, together with the gear notch and the red glow
+      behind it.
+    - Gear in a two-layer red notch under a red line with a soft glow.
+    - Left of the notch: rpm, and the accelerator pedal (bar and percent) under it. Right of it:
+      boost (value, and a bar from vacuum to boost with a tick at zero; bar by default, psi as an
+      option; channel 8 is taken as kPa above atmosphere and probably reads 0 until the second
+      LilyGO).
+    - Top-left pocket, tilted along the slope: the active preset with its mode, and a Wi-Fi warning
+      icon only while the link is slow (under 10 Hz) or lost. Top-right pocket, tilted: Haldex lock,
+      icon and big percent over a bar along the slope with the target tick.
+    - The five temperatures in one row at the bottom, one icon each, in C; amber or red out of range,
+      blue while the oil is cold.
+    - Tilted text and icons need EAL `setRotationZ` on the car, untested (the dial sketch never
+      calibrated degrees vs radians or the sign); if it does not work they fall back to level.
+    - Not on the screen: speed (the stock speedometer shows it), engine torque (not sent), G-meter,
+      stopwatch.
   - Sport view: gear and the five temperatures with icons, in the map area left of the rev counter.
   - Defaults (user, 2026-11-23): shift 6500, limiter 6800, temperatures in C.
   - Presets page (kept from the first draft, for later): a panel with the catalog, green mark on the

@@ -8,7 +8,8 @@ package local.tt;
  * dials, tab bar, bottom bar and the frame over the top corners are drawn above our layer, so the
  * layout keeps clear of them.
  *  - Large (Classic) view, after the FL5 Civic Type R's +R screen: slanted shift lights under the
- *    tab bar, lighting from both ends to the middle and flashing blue at the shift point;
+ *    tab bar, lighting from both ends to the middle (green, blue, red) and all flashing red at the
+ *    shift point;
  *    a rev line in straight pieces following the cluster housing (up the left slope, across, down
  *    the right slope), numbers under it; a red line across with a notch in the middle holding a big
  *    gear; rpm left of the notch, Haldex lock right of it; the active preset in the pocket above the
@@ -43,7 +44,7 @@ public final class TeleLayout {
     public static final int LEFT = 0;
     public static final int CENTER = 1;
     public static final int RIGHT = 2;
-    public static final int MAX = 300;
+    public static final int MAX = 400;
     public static final int CHANNELS = 64;
     public static final int MAXPRESET = 8;
     public static final int SCREEN_W = 1440;
@@ -52,9 +53,11 @@ public final class TeleLayout {
     // TTG1 channel ids (docs/MMI_LINK.md in OpenHaldex-S3), values are x1000.
     public static final int CH_RPM = 1;
     public static final int CH_SPEED = 2;
+    public static final int CH_PEDAL = 3;
     public static final int CH_COOLANT = 5;
     public static final int CH_OIL = 6;
     public static final int CH_IAT = 7;
+    public static final int CH_BOOST = 8;
     public static final int CH_HX_TARGET = 10;
     public static final int CH_HX_ACTUAL = 11;
     public static final int CH_GEAR = 13;
@@ -77,7 +80,14 @@ public final class TeleLayout {
     public static final int NOTCH_HOT = 0x7A160EFF;
     public static final int NOTCH_HOT_IN = 0xB8241AFF;
     public static final int LED_OFF = 0x1E242BFF;
-    public static final int SHIFT = 0x3D8BFFFF;
+    public static final int BLUE = 0x2F7BFFFF;
+    public static final int STRIP_LO = 0xDCE6EEFF;
+    public static final int TRACK = 0x1A2027FF;
+    public static final int EDGE = 0x2E363FFF;
+    public static final int DARK_TEXT = 0x0B0F14FF;
+    public static final int PEDAL_FILL = 0x34C759FF;
+    public static final int BOOST_FILL = 0xFF5A36FF;
+    public static final int VAC_FILL = 0x5A7A99FF;
     public static final int HALDEX = 0x2F9BFFFF;
     public static final int PRESET = 0x7FD3FFFF;
     public static final int COLD = 0x5AC8FAFF;
@@ -96,13 +106,17 @@ public final class TeleLayout {
     private static final int[] T_RED = {115, 140, 70, 125, 110};
     private static final int OIL_COLD = 60;
 
-    // Rev line (large view): straight pieces following the cluster housing. It rises along the
+    // Rev strip (large view): straight pieces following the cluster housing. It rises along the
     // frame's top-left edge, runs flat under the shift lights and drops along the top-right edge,
-    // leaving a pocket above each slope. Corner points, half the line thickness, pieces.
-    private static final int[] TP_X = {24, 341, 1038, 1416};
-    private static final int[] TP_Y = {262, 142, 142, 262};
-    private static final int TP_HALF = 12;
-    private static final int TP_SEGS = 140;
+    // leaving a pocket above each slope. The flat middle is the fattest part and ends exactly at the
+    // shift point; the slopes taper. The scale is in three parts: the left slope up to MID_RPM, the
+    // middle up to the shift point, the right slope from the shift point to barToRpm.
+    private static final int[] TP_X = {24, 325, 1057, 1416};
+    private static final int[] TP_Y = {262, 148, 148, 262};
+    private static final int HALF_MIN = 8;
+    private static final int HALF_MAX = 22;
+    private static final int TP_SEGS = 120;
+    private static final int MID_RPM = 3000;
     // Shift lights: LEDS_SIDE per side under the tab bar, lighting from both ends towards the
     // middle, LED_STEP rpm apart up to the shift point.
     private static final int LEDS_SIDE = 6;
@@ -125,6 +139,8 @@ public final class TeleLayout {
     public int barToRpm = 7000;
     /** Temperatures in degrees F when true; the car uses C (user, 2026-11-23). */
     public boolean imperial = false;
+    /** Boost in psi when true, bar when false. Channel 8 is taken as kPa above atmosphere. */
+    public boolean boostPsi = false;
 
     // Input: latest values (x1000), whether each is fresh, link state, preset catalog.
     public final int[] val = new int[CHANNELS];
@@ -182,77 +198,105 @@ public final class TeleLayout {
         boolean over = link && rpm >= shiftRpm;
         boolean limit = link && rpm >= limitRpm;
         int vc = link ? WHITE : GREY;
+        double l0 = segLen(0);
+        double l1 = segLen(1);
+        double len = tpLen();
+        double r0 = l0 + l1; // start of the right slope = the shift point
 
-        // Shift lights under the tab bar, slanted like the housing's slopes, lighting from both
-        // ends towards the middle: green, amber, red over the last LEDS_SIDE * LED_STEP rpm. From
-        // the shift point all of them flash blue, so "shift now" never looks like the red zone.
-        // A lit light gets a soft glow behind it.
-        int lw = 62;
-        int lh = 24;
-        int lgap = 10;
-        int mid = 40;
-        int sk = 9;
+        // Glow behind the gear: layered translucent red, brighter while the shift cue flashes.
+        boolean hot = over && blink;
+        int[] gw = {300, 240, 180};
+        int[] ga = {hot ? 0x22 : 0x10, hot ? 0x30 : 0x18, hot ? 0x48 : 0x22};
+        for (int i = 0; i < gw.length; i++)
+            quad(720 - gw[i], 176, 720 + gw[i], 176, 720 + gw[i] - 70, 352, 720 - gw[i] + 70, 352,
+                (RED & 0xFFFFFF00) | ga[i], true);
+
+        // Shift lights above the strip, as wide as its fat middle, slanted like the housing's slopes,
+        // lighting from both ends towards the middle: green, blue, red over the last
+        // LEDS_SIDE * LED_STEP rpm. From the shift point all flash red. Lit lights glow.
+        int lx0 = TP_X[1];
+        int lx1 = TP_X[2];
+        int mid = 24;
+        int lgap = 8;
+        int lw = ((lx1 - lx0 - mid) / 2 - (LEDS_SIDE - 1) * lgap) / LEDS_SIDE;
+        int lh = 22;
         int ly = 98;
+        int sk = 8;
         for (int side = 0; side < 2; side++) {
             for (int i = 0; i < LEDS_SIDE; i++) {
                 int on = shiftRpm - (LEDS_SIDE - i) * LED_STEP;
                 boolean lit = link && (over ? blink : rpm >= on);
-                int c = !lit ? LED_OFF : over ? SHIFT : i < 2 ? GREEN : i < 4 ? AMBER : RED;
-                int x0;
-                if (side == 0)
-                    x0 = 720 - mid / 2 - (LEDS_SIDE - i) * (lw + lgap) + lgap;
-                else
-                    x0 = 720 + mid / 2 + (LEDS_SIDE - 1 - i) * (lw + lgap);
+                int c = !lit ? LED_OFF : over ? RED : i < 2 ? GREEN : i < 4 ? BLUE : RED;
+                int x0 = side == 0 ? lx0 + i * (lw + lgap) : lx1 - lw - i * (lw + lgap);
                 int x1 = x0 + lw;
                 int t = side == 0 ? sk : -sk; // top edge shifted: "/" on the left, "\" on the right
                 int g = 6;
                 quad(x0 + t - g, ly - g, x1 + t + g, ly - g, x1 + g, ly + lh + g, x0 - g, ly + lh + g,
-                    (c & 0xFFFFFF00) | 0x48, lit);
+                    (c & 0xFFFFFF00) | 0x50, lit);
                 quad(x0 + t, ly, x1 + t, ly, x1, ly + lh, x0, ly + lh, c, true);
             }
         }
 
-        // Rev line: white, amber in the last 1000 rpm before the shift point, all red from it, the
-        // whole line flashing at the limiter. Red marks over the limiter range, a red tick at the
-        // shift point, 1..7 under the line, tilted with it on the slopes.
-        double len = tpLen();
-        int span = barToRpm - barFromRpm;
+        // Rev strip: a dark track with hairline edges; lit from cool white, warming to amber over the
+        // last 1500 rpm before the shift point, all red past it, the whole strip flashing at the
+        // limiter. Numbers sit inside the strip, dark on the lit part.
+        for (int k = 0; k < 3; k++) {
+            double a = k == 0 ? 0 : k == 1 ? l0 : r0;
+            double b = k == 0 ? l0 : k == 1 ? r0 : len;
+            bandOff(a, b, half(a) + 1, half(a) + 3, half(b) + 1, half(b) + 3, EDGE, true);
+            bandOff(a, b, -half(a) - 3, -half(a) - 1, -half(b) - 3, -half(b) - 1, EDGE, true);
+        }
         for (int i = 0; i < TP_SEGS; i++) {
             double s0 = len * i / TP_SEGS;
-            double s1 = len * (i + 1) / TP_SEGS - 1.2;
-            int from = barFromRpm + span * i / TP_SEGS;
+            double s1 = len * (i + 1) / TP_SEGS - 1.0;
+            int from = sToRpm(s0);
             int c;
             if (limit)
-                c = blink ? RED : DIM;
-            else if (rpm <= from)
-                c = DIM;
+                c = blink ? RED : TRACK;
+            else if (rpm <= from || !link)
+                c = TRACK;
             else if (over)
                 c = RED;
-            else if (from >= shiftRpm - 1000)
-                c = AMBER;
             else
-                c = WHITE;
-            band(s0, s1, -TP_HALF, TP_HALF, c, true);
+                c = stripColour(from);
+            bandOff(s0, s1, -half(s0), half(s0), -half(s1), half(s1), c, true);
         }
-        double sl = len * (limitRpm - barFromRpm) / span;
-        for (int i = 0; i < 5; i++)
-            band(sl + (len - sl) * i / 5, sl + (len - sl) * (i + 1) / 5 - 3, TP_HALF + 4, TP_HALF + 8, RED,
-                limitRpm < barToRpm);
-        double ss = len * (shiftRpm - barFromRpm) / span;
-        band(ss - 1.5, ss + 1.5, -TP_HALF - 7, TP_HALF + 7, RED, shiftRpm > barFromRpm && shiftRpm < barToRpm);
+        // Shift point: a red cut across the strip where the fat middle ends.
+        bandOff(r0 - 1.5, r0 + 1.5, -HALF_MAX - 7, HALF_MAX + 7, -HALF_MAX - 7, HALF_MAX + 7, RED, true);
+        // Limiter range: red marks along the outer edge of the right slope.
+        double sl = rpmToS(limitRpm);
+        for (int i = 0; i < 5; i++) {
+            double a = sl + (len - sl) * i / 5;
+            double b = sl + (len - sl) * (i + 1) / 5 - 3;
+            bandOff(a, b, half(a) + 5, half(a) + 10, half(b) + 5, half(b) + 10, RED, limitRpm < barToRpm);
+        }
         for (int k = (barFromRpm + 999) / 1000; k * 1000 <= barToRpm; k++) {
             if (k == 0)
                 continue;
-            slopeText(len * (k * 1000 - barFromRpm) / span, -(TP_HALF + 6), 22, true, CENTER,
-                k * 1000 >= shiftRpm ? RED : GREY, Integer.toString(k), true);
+            double sk0 = rpmToS(k * 1000);
+            double th = 2 * half(sk0);
+            boolean litK = link && rpm > k * 1000 && !(limit && !blink);
+            int nc = litK ? DARK_TEXT : k * 1000 >= shiftRpm ? RED : GREY;
+            if (th >= 30 && k * 1000 < barToRpm) {
+                int sz = (int) Math.min(30, th - 12);
+                slopeText(sk0 + 0.5, 0.46 * sz, sz, true, CENTER, nc, Integer.toString(k), true);
+            } else {
+                slopeText(sk0 - 6, -(half(sk0) + 6), 18, true, CENTER, k * 1000 >= shiftRpm ? RED : GREY,
+                    Integer.toString(k), true);
+            }
         }
 
-        // Red line across with the notch: two layers for depth, glowing from the shift point.
+        // Red line across with a soft glow, and the notch holding the gear: two layers for depth,
+        // flashing with the shift lights from the shift point.
+        quad(GRID_X0, LINE_Y - 6, NOTCH_X0 + 4, LINE_Y - 6, NOTCH_X0 + 4, LINE_Y + 6, GRID_X0, LINE_Y + 6,
+            (RED & 0xFFFFFF00) | 0x30, true);
+        quad(NOTCH_X1 - 4, LINE_Y - 6, GRID_X1, LINE_Y - 6, GRID_X1, LINE_Y + 6, NOTCH_X1 - 4, LINE_Y + 6,
+            (RED & 0xFFFFFF00) | 0x30, true);
         int ni = 12;
         quad(NOTCH_X0, LINE_Y, NOTCH_X1, LINE_Y, NOTCH_X1 - NOTCH_SLOPE, NOTCH_Y, NOTCH_X0 + NOTCH_SLOPE, NOTCH_Y,
-            over ? NOTCH_HOT : NOTCH, true);
+            hot ? NOTCH_HOT : NOTCH, true);
         quad(NOTCH_X0 + ni + 4, LINE_Y + 2, NOTCH_X1 - ni - 4, LINE_Y + 2, NOTCH_X1 - NOTCH_SLOPE - ni,
-            NOTCH_Y - ni, NOTCH_X0 + NOTCH_SLOPE + ni, NOTCH_Y - ni, over ? NOTCH_HOT_IN : NOTCH_IN, true);
+            NOTCH_Y - ni, NOTCH_X0 + NOTCH_SLOPE + ni, NOTCH_Y - ni, hot ? NOTCH_HOT_IN : NOTCH_IN, true);
         box(GRID_X0, LINE_Y - 1, NOTCH_X0 - GRID_X0 + 2, 3, RED, true);
         box(NOTCH_X1 - 2, LINE_Y - 1, GRID_X1 - NOTCH_X1 + 2, 3, RED, true);
         quad(NOTCH_X0 - 1, LINE_Y, NOTCH_X0 + 2, LINE_Y, NOTCH_X0 + NOTCH_SLOPE + 2, NOTCH_Y,
@@ -260,26 +304,50 @@ public final class TeleLayout {
         quad(NOTCH_X1 - 2, LINE_Y, NOTCH_X1 + 1, LINE_Y, NOTCH_X1 - NOTCH_SLOPE + 1, NOTCH_Y,
             NOTCH_X1 - NOTCH_SLOPE - 2, NOTCH_Y, RED, true);
         box(NOTCH_X0 + NOTCH_SLOPE - 1, NOTCH_Y - 1, NOTCH_X1 - NOTCH_X0 - 2 * NOTCH_SLOPE + 2, 3, RED, true);
-        int gc = !link ? GREY : limit && !blink ? RED : WHITE; // the notch carries the shift cue
+        int gc = !link ? GREY : limit && !blink ? RED : WHITE;
         text(720, 184, 154, true, CENTER, gc, gear(), true);
 
-        // Top-left pocket, along the rising slope: the active OpenHaldex preset, its mode above it.
-        double l0 = segLen(0);
-        slopeText(l0 * 0.16, TP_HALF + 12, 32, true, LEFT, link ? PRESET : GREY, presetName(), true);
-        slopeText(l0 * 0.16 + 18, TP_HALF + 52, 18, true, LEFT, GREY, presetMode(), true);
-
-        // Top-right pocket, along the falling slope: the link to OpenHaldex, datagrams per second.
-        double r0 = len - segLen(TP_X.length - 2);
+        // Top-left pocket, along the rising slope: the active OpenHaldex preset, its mode above it,
+        // and a Wi-Fi warning only while the link is slow or lost.
         boolean slow = link && rateHz >= 0 && rateHz < 10;
-        slopeIcon(r0 + 130, TP_HALF + 14, 30, TeleIcons.WIFI, link && !slow ? ICONC : AMBER, true);
-        slopeText(r0 + 172, TP_HALF + 12, 28, true, LEFT, link && !slow ? WHITE : AMBER, linkText(), true);
+        double ps = l0 * 0.14;
+        slopeText(ps, half(ps) + 12 + 0.82 * 32, 32, true, LEFT, link ? PRESET : GREY, presetName(), true);
+        slopeText(ps + 18, half(ps) + 52 + 0.82 * 18, 18, true, LEFT, GREY, presetMode(), true);
+        slopeIcon(l0 * 0.72, half(l0 * 0.72) + 14, 28, TeleIcons.WIFI, AMBER, !link || slow);
 
-        // Left of the notch: rpm. Right of it: Haldex lock, big percent over a bar with target tick.
-        icon(GRID_X0 + 14, 226, 36, TeleIcons.TACH, ICONC, true);
-        text(NOTCH_X0 - 8, 216, 48, true, RIGHT, over ? RED : vc, ok(CH_RPM) ? Integer.toString(rpm) : "-", link);
-        text(NOTCH_X0 - 8, 220, 34, true, RIGHT, AMBER, "NO LINK", !link);
-        icon(NOTCH_X1 + 10, 226, 36, TeleIcons.AWD, ICONC, true);
-        hxBar(NOTCH_X1 + 12, 286, GRID_X1 - NOTCH_X1 - 18, 18, GRID_X1 - 6, 216, 48);
+        // Top-right pocket, along the falling slope: Haldex lock. Icon and big percent, and under
+        // them a bar along the slope with the target as a white tick.
+        int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
+        int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
+        double ba = r0 + 60;
+        double bb = len - 30;
+        double bf = ba + (bb - ba) * act / 100;
+        double bt = ba + (bb - ba) * tgt / 100;
+        bandOff(ba, bb, half(ba) + 12, half(ba) + 22, half(bb) + 12, half(bb) + 22, TRACK, true);
+        bandOff(ba, bf, half(ba) + 12, half(ba) + 22, half(bf) + 12, half(bf) + 22, link ? HALDEX : GREY, act > 0);
+        bandOff(bt - 2, bt + 2, half(bt) + 8, half(bt) + 26, half(bt) + 8, half(bt) + 26, WHITE, ok(CH_HX_TARGET));
+        slopeIcon(ba + 4, half(ba) + 34, 32, TeleIcons.AWD, ICONC, true);
+        slopeText(ba + 50, half(ba + 50) + 32 + 0.82 * 42, 42, true, LEFT, vc,
+            ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
+
+        // Left of the notch: rpm, and the accelerator pedal under it.
+        icon(GRID_X0 + 14, 212, 34, TeleIcons.TACH, ICONC, true);
+        text(NOTCH_X0 - 8, 204, 46, true, RIGHT, over ? RED : vc, ok(CH_RPM) ? Integer.toString(rpm) : "-", link);
+        text(NOTCH_X0 - 8, 210, 34, true, RIGHT, AMBER, "NO LINK", !link);
+        int ped = ok(CH_PEDAL) ? clamp(r(val[CH_PEDAL]), 0, 100) : 0;
+        icon(GRID_X0 + 16, 266, 30, TeleIcons.PEDAL, ICONC, true);
+        bar(GRID_X0 + 58, 274, 120, 14, ped, 0, link ? PEDAL_FILL : GREY, -1);
+        text(NOTCH_X0 - 8, 266, 28, true, RIGHT, vc, ok(CH_PEDAL) ? percent(ped) : "-", true);
+
+        // Right of the notch: boost, value and a bar from vacuum to boost with a tick at zero.
+        int kpa = ok(CH_BOOST) ? r(val[CH_BOOST]) : 0;
+        int zero = 40; // percent of the bar: -100 kPa .. +150 kPa
+        int pos = clamp((kpa + 100) * 100 / 250, 0, 100);
+        icon(NOTCH_X1 + 12, 212, 34, TeleIcons.TURBO, ICONC, true);
+        text(GRID_X1 - 46, 204, 46, true, RIGHT, kpa > 0 && link ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
+        text(GRID_X1 - 4, 226, 16, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
+        bar(NOTCH_X1 + 12, 274, GRID_X1 - NOTCH_X1 - 16, 14, pos, zero,
+            !link ? GREY : kpa >= 0 ? BOOST_FILL : VAC_FILL, zero);
 
         // Temperatures in one row, an icon and a value in each cell, short dividers between.
         int cw = (GRID_X1 - GRID_X0) / T_CH.length;
@@ -291,11 +359,81 @@ public final class TeleLayout {
         }
     }
 
-    /** Text along the rev line at length s, off px out from its centre (negative: under it). */
-    private void slopeText(double s, double off, int sz, boolean b, int al, int c, String str, boolean v) {
+    /** Lit strip colour at rpm: cool white, warming to amber over the last 1500 rpm before shift. */
+    private int stripColour(int rpmAt) {
+        int from = shiftRpm - 1500;
+        if (rpmAt <= from)
+            return STRIP_LO;
+        return mix(STRIP_LO, AMBER, Math.min(1f, (rpmAt - from) / 1500f));
+    }
+
+    private static int mix(int a, int b, float t) {
+        int out = 0;
+        for (int sh = 8; sh <= 24; sh += 8) {
+            int ca = (a >>> sh) & 0xFF;
+            int cb = (b >>> sh) & 0xFF;
+            out |= (Math.round(ca + (cb - ca) * t) & 0xFF) << sh;
+        }
+        return out | 0xFF;
+    }
+
+    /** Horizontal bar: track, fill from the from-percent to pct, optional tick at tickPct. */
+    private void bar(int x0, int y0, int bw, int bh, int pct, int fromPct, int c, int tickPct) {
+        box(x0, y0, bw, bh, TRACK, true);
+        int a = Math.min(fromPct, pct);
+        int b = Math.max(fromPct, pct);
+        box(x0 + bw * a / 100, y0, bw * (b - a) / 100, bh, c, b > a);
+        box(x0 + bw * tickPct / 100 - 1, y0 - 4, 2, bh + 8, GREY, tickPct >= 0);
+    }
+
+    private String boost(int kpa) {
+        int tenths = boostPsi ? Math.round(kpa * 1.45038f) : Math.round(kpa / 10f);
+        StringBuffer sb = new StringBuffer();
+        if (tenths < 0)
+            sb.append('-');
+        int a = Math.abs(tenths);
+        sb.append(a / 10).append('.').append(a % 10);
+        return sb.toString();
+    }
+
+    /** Half the strip's thickness at length s: tapering on the slopes, full on the middle. */
+    private static double half(double s) {
+        double l0 = segLen(0);
+        double l1 = segLen(1);
+        double l2 = segLen(2);
+        if (s <= l0)
+            return HALF_MIN + (HALF_MAX - HALF_MIN) * Math.max(0, s) / l0;
+        if (s <= l0 + l1)
+            return HALF_MAX;
+        return HALF_MAX - (HALF_MAX - HALF_MIN) * Math.min(1, (s - l0 - l1) / l2);
+    }
+
+    private double rpmToS(int rpm) {
+        double l0 = segLen(0);
+        double l1 = segLen(1);
+        double l2 = segLen(2);
+        if (rpm <= MID_RPM)
+            return l0 * Math.max(0, rpm - barFromRpm) / (double) (MID_RPM - barFromRpm);
+        if (rpm <= shiftRpm)
+            return l0 + l1 * (rpm - MID_RPM) / (double) (shiftRpm - MID_RPM);
+        return l0 + l1 + l2 * Math.min(1.0, (rpm - shiftRpm) / (double) (barToRpm - shiftRpm));
+    }
+
+    private int sToRpm(double s) {
+        double l0 = segLen(0);
+        double l1 = segLen(1);
+        double l2 = segLen(2);
+        if (s <= l0)
+            return barFromRpm + (int) ((MID_RPM - barFromRpm) * s / l0);
+        if (s <= l0 + l1)
+            return MID_RPM + (int) ((shiftRpm - MID_RPM) * (s - l0) / l1);
+        return shiftRpm + (int) ((barToRpm - shiftRpm) * (s - l0 - l1) / l2);
+    }
+
+    /** Text along the strip at length s, its top edge offTop px out from the centre (negative: in). */
+    private void slopeText(double s, double offTop, int sz, boolean b, int al, int c, String str, boolean v) {
         tp(s, pa);
-        double out = off >= 0 ? off + 0.82 * sz : off; // anchor is the text's top edge
-        int i = add(TEXT, rd(pa[0] + pa[2] * out), rd(pa[1] + pa[3] * out), 0, sz, c, v && str != null);
+        int i = add(TEXT, rd(pa[0] + pa[2] * offTop), rd(pa[1] + pa[3] * offTop), 0, sz, c, v && str != null);
         size[i] = sz;
         bold[i] = b;
         align[i] = al;
@@ -303,7 +441,7 @@ public final class TeleLayout {
         rot[i] = (float) Math.toDegrees(Math.atan2(pa[2], -pa[3]));
     }
 
-    /** Icon standing on the rev line at length s, its bottom edge off px out from the centre. */
+    /** Icon standing on the strip at length s, its bottom edge off px out from the centre. */
     private void slopeIcon(double s, double off, int px, int id, int c, boolean v) {
         tp(s, pa);
         double out = off + px;
@@ -432,12 +570,16 @@ public final class TeleLayout {
         return d * d;
     }
 
-    /** Piece of the rev line between arc lengths s0..s1, offsets d0..d1 along the outward normal. */
-    private void band(double s0, double s1, double d0, double d1, int c, boolean v) {
+    /**
+     * Piece of the strip between lengths s0..s1: at s0 from offset in0 to out0 along the outward
+     * normal, at s1 from in1 to out1.
+     */
+    private void bandOff(double s0, double s1, double in0, double out0, double in1, double out1, int c,
+                         boolean v) {
         tp(s0, pa);
         tp(s1, pb);
-        quad(rd(pa[0] + pa[2] * d1), rd(pa[1] + pa[3] * d1), rd(pb[0] + pb[2] * d1), rd(pb[1] + pb[3] * d1),
-            rd(pb[0] + pb[2] * d0), rd(pb[1] + pb[3] * d0), rd(pa[0] + pa[2] * d0), rd(pa[1] + pa[3] * d0), c, v);
+        quad(rd(pa[0] + pa[2] * out0), rd(pa[1] + pa[3] * out0), rd(pb[0] + pb[2] * out1), rd(pb[1] + pb[3] * out1),
+            rd(pb[0] + pb[2] * in1), rd(pb[1] + pb[3] * in1), rd(pa[0] + pa[2] * in0), rd(pa[1] + pa[3] * in0), c, v);
     }
 
     private static int rd(double d) {
