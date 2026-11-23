@@ -8,7 +8,7 @@ the cockpit map area, like a second AltScreen page.
 ## Goal (user, 2026-11-22)
 
 - **Autocross view instead of the map** (user, 2026-11-23): when it is on, no map shows and the
-  information fills the cockpit, keeping clear of the stock dials. A **long press** on the scroll
+  information fills the cockpit, keeping clear of the stock dials. A **double press** on the scroll
   wheel switches it on and off.
 - **Classic (large) view:** the rev counter and shift light big and in the centre.
 - **Sport (small) view:** only gear and engine information for now.
@@ -200,10 +200,14 @@ wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker ru
     coolant, oil, intake, DSG, Haldex clutch temperature, Haldex lock bar with target tick.
     Values turn amber or red out of range, blue when the oil is cold. No G-meter, no stopwatch.
   - Sport view: gear and the five temperatures with icons, in the map area left of the rev counter.
-  - Defaults: shift 6300, limiter 6700, imperial.
+  - Defaults (user, 2026-11-23): shift 6500, limiter 6800, imperial.
   - Presets page (kept from the first draft, for later): a panel with the catalog, green mark on the
     active preset, cursor row.
-  - Open: how the long press reaches the HMI (needs a trace in the car), and the gear (channel 13
-    probably reads 0 in the car; it can be worked out from rpm and speed instead).
+  - Open: how the scroll-wheel double press reaches the HMI (needs a trace in the car).
+  - Gear: channel 13 as sent; it probably reads 0 ("N") until a second LilyGO on the powertrain
+    CAN sends it (user decision 2026-11-23: no gear worked out from rpm and speed). The hotspot
+    takes several clients (dnsmasq leases .10-.99), so that board can join it too: the head-unit
+    receiver merges channels from every TTG1 sender, and preset commands go only to the sender of
+    the preset catalog (TTP1).
 - Shift cue: a sound clip played by the head unit. How to play one, and its delay, is not known
   yet.

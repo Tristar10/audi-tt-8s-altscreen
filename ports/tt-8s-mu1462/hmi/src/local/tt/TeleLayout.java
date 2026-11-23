@@ -3,7 +3,7 @@ package local.tt;
 /**
  * Layout of the OpenHaldex autocross view (wiki/Telemetry.md). Pure Java, no EAL.
  *
- * The autocross view replaces the map: a long press on the scroll wheel switches it on and off.
+ * The autocross view replaces the map: a double press on the scroll wheel switches it on and off.
  * It fills the whole cockpit screen with an opaque background, so no map shows. The cluster's own
  * dials, tab bar, bottom bar and the frame over the top corners are drawn above our layer, so the
  * layout keeps clear of them.
@@ -112,8 +112,8 @@ public final class TeleLayout {
     private static final int GRID_ROW = 58;
 
     // Settings
-    public int shiftRpm = 6300;
-    public int limitRpm = 6700;
+    public int shiftRpm = 6500;
+    public int limitRpm = 6800;
     public int barFromRpm = 0;
     public int barToRpm = 7000;
     public boolean imperial = true;

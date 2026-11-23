@@ -63,7 +63,7 @@ public class TelePreview {
         set(t, TeleLayout.CH_OIL, 132);
         panel(g, 1, large, t, TeleLayout.VIEW_LARGE, TeleLayout.PAGE_LIVE, caps[1], masks);
 
-        set(t, TeleLayout.CH_RPM, 6420);
+        set(t, TeleLayout.CH_RPM, 6620);
         t.now = 0;
         panel(g, 2, large, t, TeleLayout.VIEW_LARGE, TeleLayout.PAGE_LIVE, caps[2], masks);
 
