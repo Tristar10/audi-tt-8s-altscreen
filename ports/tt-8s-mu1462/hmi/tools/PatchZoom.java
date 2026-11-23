@@ -197,6 +197,41 @@ public final class PatchZoom implements Opcodes {
         System.out.println("patched " + cls + ".getScreen and getText (settings page hook, class version " + cn.version + ")");
     }
 
+    /**
+     * v63: HMIRegistryEvo.getOptionDrawers(terminal, app) (framework registry every options-drawer
+     * request goes through; class version 46, 3 KB - the activator above it is version 49, which we do
+     * not touch): the drawers go through ScreenHook.drawers(drawers, app, terminal) - the navigation
+     * app's map options get our rows.
+     */
+    static void patchOptionDrawers(String jar, String outdir) throws Exception {
+        String cls = "de/audi/tghu/fwhmi/evo/HMIRegistryEvo";
+        String arr = "[Lde/audi/tghu/hmi/evo/IDrawerControllerEvo;";
+        ClassNode cn = new ClassNode();
+        new ClassReader(read(jar, cls)).accept(cn, 0);
+        if (cn.version > V1_4) throw new IllegalStateException(cls + " version " + cn.version);
+        int n = 0;
+        for (MethodNode m : cn.methods) {
+            if (!m.name.equals("getOptionDrawers") || !m.desc.equals("(II)" + arr)) continue;
+            if ((m.access & ACC_STATIC) != 0) throw new IllegalStateException("getOptionDrawers is static");
+            for (var insn : m.instructions.toArray()) {
+                if (insn.getOpcode() != ARETURN) continue;
+                InsnList post = new InsnList();
+                post.add(new VarInsnNode(ILOAD, 2));
+                post.add(new VarInsnNode(ILOAD, 1));
+                post.add(new MethodInsnNode(INVOKESTATIC, "local/tt/ScreenHook", "drawers",
+                    "(Ljava/lang/Object;II)Ljava/lang/Object;", false));
+                post.add(new org.objectweb.asm.tree.TypeInsnNode(CHECKCAST, arr));
+                m.instructions.insertBefore(insn, post);
+                n++;
+            }
+        }
+        if (n != 1) throw new IllegalStateException("expected one getOptionDrawers return, found " + n);
+        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        cn.accept(cw);
+        write(Path.of(outdir, cls + ".class"), cw.toByteArray());
+        System.out.println("patched " + cls + ".getOptionDrawers (settings rows in map options, class version " + cn.version + ")");
+    }
+
     /** CombiBAPListener.setCombiService(service): RgdBus.combi(this, service); then the stock body. */
     static void patchCombiService(ClassNode cn) {
         int n = 0;
@@ -382,6 +417,7 @@ public final class PatchZoom implements Opcodes {
         });
         patchViewMode(args[0], args[2]);
         patchScreenFactory(args[0], args[2]);
+        patchOptionDrawers(args[0], args[2]);
         patchSpy(args[0], args[2], "de/audi/tghu/navi/app/cluster/KOMOService", new String[][] {
             { "setRouteInfo", "([Lorg/dsi/ifc/komoview/RouteInfoElement;)V", "komoInfo" },
             { "setRouteInfoElement", "(Lorg/dsi/ifc/komoview/RouteInfoElement;)V", "komoElem" },
@@ -404,8 +440,7 @@ public final class PatchZoom implements Opcodes {
                 if (!p.toString().endsWith(".class") || p.getFileName().toString().startsWith("._")) continue;
                 ClassNode gate = new ClassNode();
                 new ClassReader(Files.readAllBytes(p)).accept(gate, ClassReader.SKIP_FRAMES);
-                if (!gate.name.startsWith("local/tt/") && !gate.name.equals("de/audi/tghu/navi/app/cluster/TtRgi")
-                    && !gate.name.equals("de/audi/tghu/connectivity/hmi/evohighmmikombi/TtSettingsPage"))
+                if (!gate.name.startsWith("local/tt/") && !gate.name.equals("de/audi/tghu/navi/app/cluster/TtRgi"))
                     throw new IllegalStateException("unexpected class " + gate.name);
                 if (gate.signature != null) throw new IllegalStateException(gate.name + " uses generics");
                 for (MethodNode m : gate.methods) {
