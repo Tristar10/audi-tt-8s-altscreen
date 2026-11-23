@@ -4,11 +4,16 @@
     python3 gauge-send.py --host 192.168.x.1            # demo values, 20 Hz, until Ctrl+C
     python3 gauge-send.py --host 192.168.x.1 --set rpm=3000 boost=120 --once
     python3 gauge-send.py --dump packet.bin --set rpm=3000   # write one datagram to a file (PC test)
+    python3 gauge-send.py --host 192.168.x.1 --presets       # also play OpenHaldex's preset side
 
 Sends "TTG1" datagrams to the head unit's ttlink (default port 49160, already open in the stock
 firewall for hotspot clients) and reads its "TTA1" acks: once a second it prints acks received,
 loss and round-trip time, like the ESP32 test sketch does on its serial port.
-Same format as esp32/tt_gauge_tx.cpp and headunit/ttlink.c. Values in SI units.
+Same format as OpenHaldex-S3 mmi_link.cpp and headunit/ttlink.c. Values in SI units.
+
+--presets also sends the "TTP1" preset catalog (on start and every 5 s), answers "TTC1" apply
+commands with "TTR1" and reports the active preset on channel 22, like OpenHaldex docs/PRESETS.md.
+The catalog is OpenHaldex's compiled-in default list; --refuse N answers every apply with result N.
 """
 import argparse
 import math
@@ -20,7 +25,7 @@ CHANNELS = {
     'rpm': 1, 'speed': 2, 'pedal': 3, 'torque': 4, 'coolant': 5, 'oil': 6, 'iat': 7, 'boost': 8,
     'lambda': 9, 'haldex_lock': 10, 'haldex_act': 11, 'haldex_mode': 12, 'gear': 13, 'lat_g': 14,
     'long_g': 15, 'dsg_oil': 16, 'battery': 17, 'oil_press': 18, 'clutch_temp': 19,
-    'steering': 20, 'brake': 21,
+    'steering': 20, 'brake': 21, 'preset': 22,
     'up_s': 60, 'rssi': 61, 'sent': 62,   # link test: sender uptime, Wi-Fi RSSI dBm, datagrams sent
 }
 
@@ -45,6 +50,34 @@ def demo(t):
             11: 100 * ((math.sin(t * 1.3 - 0.4) + 1) / 2), 12: 2}
 
 
+# OpenHaldex default catalog: id, name, mode number (openhaldex_mode_t), map path.
+PRESETS = [(1, 'Street', 0, ''), (2, 'Autocross', 9, '/maps/aggressive.txt'), (3, 'Launch', 2, ''),
+           (4, 'Wet', 9, '/maps/conservative.txt'), (5, 'FWD', 1, '')]
+
+
+def crc16_ccitt(data, crc=0xFFFF):
+    for b in data:
+        crc ^= b << 8
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x1021) if crc & 0x8000 else (crc << 1)
+            crc &= 0xFFFF
+    return crc
+
+
+def catalog_version(presets):
+    # Stand-in for the firmware's CRC (same inputs, byte layout may differ); never 0.
+    data = b''.join(bytes([i, m]) + n.encode() + mp.encode() for i, n, m, mp in presets)
+    return crc16_ccitt(data) or 1
+
+
+def catalog_packet(presets, key):
+    out = b'TTP1' + struct.pack('>IHB', key & 0xFFFFFFFF, catalog_version(presets), len(presets))
+    for i, n, m, _ in presets:
+        nb = n.encode()[:16]
+        out += bytes([i, m, len(nb)]) + nb
+    return out
+
+
 def parse_set(items):
     vals = {}
     for it in items or []:
@@ -65,6 +98,8 @@ def main():
     ap.add_argument('--set', nargs='*', help='name=value pairs instead of the demo sweep')
     ap.add_argument('--once', action='store_true')
     ap.add_argument('--dump', help='write one datagram to this file and exit')
+    ap.add_argument('--presets', action='store_true', help="also play OpenHaldex's preset side")
+    ap.add_argument('--refuse', type=int, help='answer every apply with this TTR1 result code')
     a = ap.parse_args()
 
     fixed = parse_set(a.set)
@@ -79,12 +114,19 @@ def main():
     sent_at = {}                       # seq -> send time, for the round trip
     acks, rtts, last_report = 0, [], t0
     next_send = t0
+    active, last_cat, answered = 255, 0.0, {}   # preset state for --presets
+    cat_ver = catalog_version(PRESETS)
     try:
         while True:
             now = time.time()
             if now >= next_send:
                 vals = dict(fixed or demo(now - t0))
                 vals.update({60: now - t0, 62: sent})
+                if a.presets:
+                    vals[22] = active
+                    if now - last_cat >= 5.0:
+                        s.sendto(catalog_packet(PRESETS, a.key), (a.host, a.port))
+                        last_cat = now
                 s.sendto(packet(vals, a.key, seq), (a.host, a.port))
                 sent_at[seq] = now
                 sent += 1
@@ -94,7 +136,28 @@ def main():
                     time.sleep(0.5)
             try:
                 while True:
-                    data, _ = s.recvfrom(64)
+                    data, src = s.recvfrom(64)
+                    if a.presets and len(data) == 14 and data[:4] == b'TTC1':
+                        key, cseq, cmd, pid, ver = struct.unpack('>IHBBH', data[4:])
+                        if key != a.key:
+                            continue
+                        if cseq in answered:            # retry: answer again, don't apply twice
+                            res = answered[cseq]
+                        elif a.refuse is not None:
+                            res = a.refuse
+                        elif cmd != 1:
+                            res = 255
+                        elif ver != cat_ver:
+                            res = 1
+                        elif pid not in [p[0] for p in PRESETS]:
+                            res = 2
+                        else:
+                            res, active = 0, pid
+                        answered[cseq] = res
+                        s.sendto(b'TTR1' + struct.pack('>IHBBH', a.key, cseq, res, active, cat_ver), src)
+                        print('        TTC1 seq=%d apply %d (v=0x%04x) -> result %d, active %d'
+                              % (cseq, pid, ver, res, active), flush=True)
+                        continue
                     if len(data) == 20 and data[:4] == b'TTA1':
                         aseq, _, rx, lost, up = struct.unpack('>HHIII', data[4:])
                         acks += 1

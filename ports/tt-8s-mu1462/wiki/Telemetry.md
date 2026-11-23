@@ -20,8 +20,9 @@ the cockpit map area, like a second AltScreen page.
 | Step | State |
 |---|---|
 | How the MMI's Wi-Fi works | Found in the firmware (below) |
-| Head-unit test tool `ttlink` | Built for QNX; tested on the PC against the laptop sender: 81 datagrams, 0 lost, acks back, wrong key rejected |
-| Sender in OpenHaldex-S3 (`mmi_link.cpp`) | Added to the OpenHaldex firmware; builds with PlatformIO (RAM +0.9 KB, flash +10 KB). Not flashed |
+| Head-unit test tool `ttlink` | Built for QNX; tested on the PC against the laptop sender: 81 datagrams, 0 lost, acks back, wrong key rejected. Builds on macOS too |
+| Sender in OpenHaldex-S3 (`mmi_link.cpp`) | Merged into OpenHaldex branch `one-board-ble` (BLE + MMI link on one board, ~96 KB RAM free with two BLE clients). Not bench-tested with a hotspot yet |
+| Presets from the MMI | OpenHaldex side done on `one-board-ble` (not flashed). `ttlink -a` can apply one; tested on the PC against `gauge-send.py --presets` |
 | Link test in the car | Not done |
 | Cockpit text page, wheel double-press | Not started. The dial sketch in `gauges/hmi` is on hold and kept only for its drawing and threading code |
 
@@ -29,9 +30,16 @@ the cockpit map area, like a second AltScreen page.
 
 OpenHaldex-S3 already decodes the chassis CAN with its built-in VW DBC tables (the `received_*`
 values its RaceChrono feed uses). The MMI link reads those same values, so nothing new is decoded
-on the ESP32. Its own `OpenHaldex-S3` access point keeps running: the ESP32 runs AP and client at
-once, and joins the MMI hotspot with OpenHaldex's existing client Wi-Fi settings (Setup page,
-the same ones used for OTA).
+on the ESP32.
+
+One board does everything (OpenHaldex branch `one-board-ble`, user decision 2026-11-22):
+
+- **BLE:** RaceChrono (DIY BLE) and the OpenHaldex iOS app, which replaces the web page.
+- **Wi-Fi:** only the client link to the MMI hotspot. OpenHaldex's own access point, web page and
+  RC3 server are compiled out (`OH_ENABLE_WEB=0`). The hotspot SSID and password are set in the
+  app; without them Wi-Fi stays off.
+- Measured on the T-2CAN: about 96 KB internal RAM free, never below 93 KB over 13 minutes with
+  RaceChrono and the app both connected. With the AP and web page still on it fell to 4 KB.
 
 ## Which side is the access point
 
@@ -55,8 +63,7 @@ for that:
 - The ESP32 sends to its gateway address, which is the MMI, so no IP address is configured.
 - Until the head unit answers, OpenHaldex sends one probe a second; with acks it streams at
   20 Hz. A home router on the client side never gets the full stream.
-- OpenHaldex's own AP is 192.168.4.1/24. If the MMI hotspot used the same subnet the link could
-  not work; OpenHaldex logs a warning if it sees that. Step 1 below checks the hotspot subnet.
+- With OpenHaldex's own AP compiled out, the hotspot subnet no longer matters.
 
 ## Link protocol
 
@@ -94,19 +101,49 @@ Channels:
 | 9 | lambda | 61 | RSSI dBm (sent automatically) |
 | 10 | Haldex request % | 62 | datagrams sent (sent automatically) |
 
-Also 18 oil pressure bar, 19 Haldex clutch °C, 20 steering angle °, 21 brake pressure bar.
+Also 18 oil pressure bar, 19 Haldex clutch °C, 20 steering angle ° (**right positive**, left
+negative), 21 brake pressure bar, 22 active preset id (255 = none).
 OpenHaldex does not send 9, 14, 15 or 17 (no source on the bus yet). Full source mapping:
 `docs/MMI_LINK.md` in OpenHaldex-S3.
 
 They are defined in `ttlink.c`, `gauge-send.py` and OpenHaldex `mmi_link.cpp`; change all three together.
 
+## Presets
+
+The MMI switches OpenHaldex between **presets**, not raw modes. A preset is a named bundle kept on
+OpenHaldex: a mode, optionally a map file, and optionally its gates (`docs/PRESETS.md` in
+OpenHaldex-S3). The head unit hardcodes none of it; it shows whatever catalog OpenHaldex sends.
+Applying is safe while driving: every preset's map is preloaded into PSRAM and swapped in at once,
+with no file access. OpenHaldex refuses during calibration or CAN View capture.
+
+Defaults until the user picks: 1 Street (stock), 2 Autocross (aggressive map), 3 Launch (50:50),
+4 Wet (conservative map), 5 FWD. At most 8.
+
+Same socket and key as TTG1, big-endian:
+
+| Message | Direction | Content |
+|---|---|---|
+| `TTP1` | OpenHaldex to MMI, on link-up, on change, every 5 s | catalog version u16, count, then per preset: id, mode, name length, name (≤ 16 bytes) |
+| `TTC1` | MMI to OpenHaldex, to the TTG1 source address | command seq u16, command (1 = apply preset), preset id, catalog version u16. Reusing the seq is a retry and is not applied twice |
+| `TTR1` | OpenHaldex to MMI, at once | echoed seq, result, active id, catalog version. Results: 0 ok, 1 catalog version mismatch, 2 unknown preset, 3 calibration running, 4 CAN View capture active, 5 preset map missing, 255 unknown command |
+
+Channel 22 in the TTG1 stream is the real confirmation; a lost TTR1 does no harm. On result 1 the
+head unit waits for the next catalog (at most 5 s).
+
+`ttlink` speaks this too: it prints the catalog, `-a 2` applies preset 2 once the catalog is in,
+and typing a preset id and Enter while it runs applies that one. It sends each command up to
+three times, 500 ms apart, with the same seq. Tested on the PC against `gauge-send.py --presets`
+(apply ok, unknown preset, refusal "calibration running", no catalog means no command); the retry
+path and the real firmware are not tested yet.
+
 ## Files
 
 | File | What |
 |---|---|
-| `gauges/headunit/ttlink.c` | Head-unit tool: listens on UDP 49160 and logs one summary per second, with `-v` one line per datagram. Acks each datagram. Log in `/tmp/ttlink.log`. No jar and no HMI restart |
-| OpenHaldex-S3 `src/functions/telemetry/mmi_link.cpp` | Sender: low-priority task, reads the decoded CAN values, sends, reads acks; stats in `/api/network` under `mmi` |
-| `gauges/scripts/gauge-send.py` | Laptop stand-in for OpenHaldex, with the same output |
+| `gauges/headunit/ttlink.c` | Head-unit tool: listens on UDP 49160 and logs one summary per second, with `-v` one line per datagram. Acks each datagram, prints the preset catalog, `-a` applies a preset. Log in `/tmp/ttlink.log`. No jar and no HMI restart |
+| OpenHaldex-S3 `src/functions/telemetry/mmi_link.cpp` | Sender: runs from `loop()`, no task of its own; reads the decoded CAN values, sends, reads acks; stats in the app's Wi-Fi page (`/api/network`, `mmi`) |
+| OpenHaldex-S3 `docs/PRESETS.md`, `scripts/mmi_sim.py` | Preset spec; Python fake head unit for bench tests |
+| `gauges/scripts/gauge-send.py` | Laptop stand-in for OpenHaldex, with the same output; `--presets` also plays the preset side |
 
 Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 
@@ -118,11 +155,11 @@ wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker ru
 
 | # | Do | Pass |
 |---|---|---|
-| 1 | MMI: turn the Wi-Fi hotspot on and note the SSID and password. Join it with the laptop | Laptop gets an address (note the subnet: it must not be 192.168.4.x); `ping` the gateway answers. If the hotspot will not start without a data plan, stop here |
+| 1 | MMI: turn the Wi-Fi hotspot on and note the SSID and password. Join it with the laptop | Laptop gets an address; `ping` the gateway answers. If the hotspot will not start without a data plan, stop here |
 | 2 | Copy `ttlink` to `/mnt/app/root/tt/`, then over SSH run `chmod +x` on it and start it with `-v` | `ttlink listening on udp 49160`. If the bind fails, the port is taken: `-p 49161` |
-| 3 | Laptop: `python3 gauge-send.py --host <gateway>` | Laptop shows acks and rtt; ttlink shows rx and values. This proves the path without the ESP32 |
-| 4 | Flash OpenHaldex-S3 with the MMI link. On its Setup page enter the MMI hotspot SSID and password as the client Wi-Fi, client enabled | `uaputl sta_list` lists the ESP32; ttlink shows `esp_up_s`, `rssi` and live rpm/gear; `http://openhaldex.local/api/network` (phone on the OpenHaldex AP) shows `"mmi":{"linked":true…}` |
-| 5 | Engine running, parked: rev it, change Haldex mode | rpm and `hx_mode` follow in ttlink; Haldex control unaffected |
+| 3 | Laptop: `python3 gauge-send.py --host <gateway> --presets` | Laptop shows acks and rtt; ttlink shows rx, values and the catalog. Typing `2` in ttlink applies preset 2 on the laptop. This proves the path without the ESP32 |
+| 4 | Flash OpenHaldex `one-board-ble`. In the OpenHaldex app enter the MMI hotspot SSID and password | `uaputl sta_list` lists the ESP32; ttlink shows `esp_up_s`, `rssi`, live rpm/gear and the catalog; the app's Wi-Fi page shows the MMI link as linked |
+| 5 | Engine running, parked: rev it; in ttlink type a preset id | rpm follows in ttlink; `reply ... ok` and `active preset` change; the app shows the same preset; Haldex control unaffected |
 
 ## Next, after the link works
 
@@ -131,4 +168,8 @@ wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker ru
   traced yet.
 - Move the receiver into `tt-zoom.jar` (Java, as RgdBus does) and draw the text page with EAL
   text nodes over the map area ([Cockpit drawing](Cockpit-drawing.md)).
-- Large view layout: rev counter across the top, big gear, telemetry lines.
+- Pages, proposed: Live (rpm bar with shift zone, huge gear, Haldex bar and preset name, speed,
+  temperatures only when out of range), Last run (peak rpm, limiter hits, max lock, peak temps),
+  Presets (scroll, press to apply). The exact look comes later.
+- Shift cue: a sound clip played by the head unit. How to play one, and its delay, is not known
+  yet.

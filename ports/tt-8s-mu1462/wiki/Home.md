@@ -18,7 +18,7 @@ Everything marked "works" was checked on one car (US TT, MU1462), November 2026.
 | Stock guidance display fed with iPhone turns | Not possible | [Stock guidance dead ends](Stock-guidance-dead-ends.md) |
 | CarPlay tab and map switching without drops | Fixed for normal switching (renderer build 5/6, supervisor v9); light-speed flipping out of scope | [Display-window handover](Display-window-handover.md) |
 | Bottom strip with Google/Apple turn text ("Left to Alpha St") | Works | [CarPlay map](CarPlay-map.md#the-bottom-strip) |
-| OpenHaldex telemetry over the MMI hotspot (text page on the map area) | Head-unit tool built and PC-tested; sender added to OpenHaldex-S3; not in the car yet | [Telemetry](Telemetry.md) |
+| OpenHaldex telemetry over the MMI hotspot (text page on the map area) | Link and presets PC-tested; sender in OpenHaldex `one-board-ble`; not in the car yet | [Telemetry](Telemetry.md) |
 
 ## Pages
 
