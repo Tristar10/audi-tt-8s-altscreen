@@ -175,9 +175,14 @@ public class TelePreview {
                 }
                 g.fillPolygon(xs, ys, 4);
             } else if (t.kind[i] == TeleLayout.ICON) {
-                int px = t.w[i];
-                BufferedImage ic = new BufferedImage(px, px, BufferedImage.TYPE_INT_ARGB);
-                ic.setRGB(0, 0, px, px, local.tt.TeleIcons.argb(t.size[i], px, c >>> 8), 0, px);
+                int iw = t.w[i];
+                int ih = t.h[i];
+                BufferedImage ic = new BufferedImage(iw, ih, BufferedImage.TYPE_INT_ARGB);
+                int[] px = local.tt.TeleIcons.argb(t.size[i], iw, ih, c >>> 8);
+                int al = c & 0xFF;
+                for (int k = 0; k < px.length; k++)
+                    px[k] = ((((px[k] >>> 24) * al) / 255) << 24) | (px[k] & 0xFFFFFF);
+                ic.setRGB(0, 0, iw, ih, px, 0, iw);
                 g.drawImage(ic, t.x[i], t.y[i], null);
             } else {
                 Font f = new Font(FONT, t.bold[i] ? Font.BOLD : Font.PLAIN, t.size[i]);

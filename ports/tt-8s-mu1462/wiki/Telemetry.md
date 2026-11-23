@@ -164,7 +164,15 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele2)
+## Autocross view on the head unit (tt-zoom tele3)
+
+tele2 on the car (2026-11-23): `-deg` tilt is right. The car's font draws about 1.45x the preview's at
+the same size (cap height about the size itself), so texts crowded their neighbours; the gear was
+soft; refresh looked slow. tele3: texts at 70 % of the layout size (`/tmp/tt-tele-font` holds another
+percentage to try), the gear drawn as our own stroke glyphs (TeleIcons GLYPH, sharp at any size),
+84 rev-strip pieces instead of 120, 20 Haldex pieces instead of 25, tick up to 30 frames/s.
+
+### Earlier: tele2
 
 First car run (tele1, 2026-11-23, parked, demo values): the whole layout draws and moves. Found:
 - tele1 was built on the v63 *prototype* (90300bc), not on the v63 the car runs (4e07548): the

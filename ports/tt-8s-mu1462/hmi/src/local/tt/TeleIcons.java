@@ -77,27 +77,90 @@ public final class TeleIcons {
             CAP, 50, 36, 50, 52, 4.5f, CIRC, 50, 63, 4.5f},
     };
 
+    /**
+     * Big gear glyphs, drawn from strokes so they stay sharp at any size (the car's font is scaled
+     * up and goes soft above about 100 px). Grid 60 wide, 100 high; id GLYPH + index in GLYPH_CHARS.
+     */
+    public static final int GLYPH = 100;
+    public static final String GLYPH_CHARS = "0123456789NRP-";
+    /** Width of a glyph per unit of height. */
+    public static final float GLYPH_ASPECT = 0.6f;
+    private static final float[][] GLYPHS = new float[GLYPH_CHARS.length()][];
+
+    static {
+        float l = 10;
+        float r = 50;
+        float t = 10;
+        float b = 90;
+        float m = 50;
+        float c = 12;
+        float[][] g = {
+            {l, t + c, l + c, t, r - c, t, r, t + c, r, b - c, r - c, b, l + c, b, l, b - c, l, t + c},
+            {20, 24, 34, t, 34, b},
+            {l, t + c, l + c, t, r - c, t, r, t + c, r, m - 8, l, b, r, b},
+            {l, t + c, l + c, t, r - c, t, r, t + c, r, m - c, r - c, m, 26, m, r - c, m, r, m + c, r, b - c, r - c, b,
+                l + c, b, l, b - c},
+            {r - 8, b, r - 8, t, l, m + 16, r, m + 16},
+            {r, t, l, t, l, m - 4, r - c, m - 4, r, m - 4 + c, r, b - c, r - c, b, l + c, b, l, b - c},
+            {r, t + c, r - c, t, l + c, t, l, t + c, l, b - c, l + c, b, r - c, b, r, b - c, r, m + c, r - c, m, l, m},
+            {l, t, r, t, r, t + c, 24, b},
+            {l + c, m, l, m - c, l, t + c, l + c, t, r - c, t, r, t + c, r, m - c, r - c, m, l + c, m, l, m + c, l, b - c,
+                l + c, b, r - c, b, r, b - c, r, m + c, r - c, m},
+            {l, b - c, l + c, b, r - c, b, r, b - c, r, t + c, r - c, t, l + c, t, l, t + c, l, m - c, l + c, m, r, m},
+            {l, b, l, t, r, b, r, t},
+            {l, b, l, t, r - c, t, r, t + c, r, m - c, r - c, m, l, m, 28, m, r, b},
+            {l, b, l, t, r - c, t, r, t + c, r, m - c, r - c, m, l, m},
+            {l + 4, m, r - 4, m},
+        };
+        for (int i = 0; i < g.length; i++) {
+            float[] pts = g[i];
+            int n = pts.length / 2 - 1;
+            float[] ops = new float[n * 6];
+            for (int k = 0; k < n; k++) {
+                ops[k * 6] = CAP;
+                ops[k * 6 + 1] = pts[k * 2];
+                ops[k * 6 + 2] = pts[k * 2 + 1];
+                ops[k * 6 + 3] = pts[k * 2 + 2];
+                ops[k * 6 + 4] = pts[k * 2 + 3];
+                ops[k * 6 + 5] = 8.5f;
+            }
+            GLYPHS[i] = ops;
+        }
+    }
+
     private TeleIcons() {
+    }
+
+    /** Glyph id for a gear character, or -1. */
+    public static int glyph(char ch) {
+        int i = GLYPH_CHARS.indexOf(ch);
+        return i < 0 ? -1 : GLYPH + i;
     }
 
     /** Icon pixels, ARGB, px * px, in colour rgb (0xRRGGBB). */
     public static int[] argb(int id, int px, int rgb) {
-        float[] ops = ICONS[id];
-        int[] out = new int[px * px];
+        return argb(id, px, px, rgb);
+    }
+
+    /** Pixels, ARGB, w * h; the 0..100 grid is scaled to the height (glyphs are narrower). */
+    public static int[] argb(int id, int w, int h, int rgb) {
+        float[] ops = id >= GLYPH ? GLYPHS[id - GLYPH] : ICONS[id];
+        int[] out = new int[w * h];
         int ss = 4;
-        for (int py = 0; py < px; py++) {
-            for (int pxl = 0; pxl < px; pxl++) {
+        float k = 100f / h;
+        for (int py = 0; py < h; py++) {
+            for (int pxl = 0; pxl < w; pxl++) {
                 int hits = 0;
                 for (int sy = 0; sy < ss; sy++) {
                     for (int sx = 0; sx < ss; sx++) {
-                        float u = (pxl + (sx + 0.5f) / ss) * 100f / px;
-                        float v = (py + (sy + 0.5f) / ss) * 100f / px;
+                        float u = (pxl + (sx + 0.5f) / ss) * k;
+                        float v = (py + (sy + 0.5f) / ss) * k;
                         if (inside(ops, u, v))
                             hits++;
                     }
                 }
                 int a = hits * 255 / (ss * ss);
-                out[py * px + pxl] = (a << 24) | (rgb & 0xFFFFFF);
+                out[py * w + pxl] = (a << 24) | (rgb & 0xFFFFFF);
             }
         }
         return out;

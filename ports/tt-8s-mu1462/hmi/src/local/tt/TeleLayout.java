@@ -119,7 +119,7 @@ public final class TeleLayout {
     private static final int[] TP_Y = {266, 152, 152, 266};
     private static final int HALF_MIN = 15;
     private static final int HALF_MAX = 27;
-    private static final int TP_SEGS = 120;
+    private static final int TP_SEGS = 84;
     private static final int MID_RPM = 3000;
     // Shift lights: LEDS_SIDE per side under the tab bar, lighting from both ends towards the
     // middle, LED_STEP rpm apart up to the shift point.
@@ -317,7 +317,7 @@ public final class TeleLayout {
             NOTCH_X1 - NOTCH_SLOPE - 2, NOTCH_Y, RED, true);
         box(NOTCH_X0 + NOTCH_SLOPE - 1, NOTCH_Y - 1, NOTCH_X1 - NOTCH_X0 - 2 * NOTCH_SLOPE + 2, 3, RED, true);
         int gc = !link ? GREY : limit && !blink ? RED : WHITE;
-        text(720, 184, 154, true, CENTER, gc, gear(), true);
+        gearGlyph(720, 208, 104, gc);
 
         // Top-left pocket, along the rising slope: the active OpenHaldex preset, its mode above it,
         // and a Wi-Fi warning only while the link is slow or lost.
@@ -335,7 +335,7 @@ public final class TeleLayout {
         double bb = len - 10;
         // Fixed pieces (no shape changes per frame on the car): each piece is lit or not, and the
         // target tick is a white mark over the piece holding the target.
-        int hs = 25;
+        int hs = 20;
         int ti = Math.min(hs - 1, tgt * hs / 100);
         for (int j = 0; j < hs; j++) {
             double a = ba + (bb - ba) * j / hs;
@@ -566,7 +566,7 @@ public final class TeleLayout {
 
         // Gear, red past the shift point, flashing at the limiter; temperatures beside it.
         int gc = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
-        text(128, 150, 200, true, CENTER, gc, gear(), true);
+        gearGlyph(128, 168, 150, gc);
         text(128, 336, 24, true, CENTER, AMBER, "NO LINK", !link);
         box(256, 156, 2, 200, LINE, true);
         for (int t = 0; t < T_CH.length; t++)
@@ -777,6 +777,17 @@ public final class TeleLayout {
 
     private void box(int x0, int y0, int w0, int h0, int c, boolean v) {
         add(BOX, x0, y0, w0, h0, c, v);
+    }
+
+    /** The gear as one sharp glyph (TeleIcons), centred at cx, top at y0, gh high. */
+    private void gearGlyph(int cx, int y0, int gh, int c) {
+        String g = gear();
+        int id = TeleIcons.glyph(g.length() > 0 ? g.charAt(0) : '-');
+        if (id < 0)
+            id = TeleIcons.glyph('-');
+        int gw = Math.round(gh * TeleIcons.GLYPH_ASPECT);
+        int i = add(ICON, cx - gw / 2, y0, gw, gh, c, true);
+        size[i] = id;
     }
 
     private void icon(int x0, int y0, int px, int id, int c, boolean v) {

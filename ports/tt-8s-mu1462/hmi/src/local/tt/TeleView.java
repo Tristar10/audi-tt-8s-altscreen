@@ -22,7 +22,7 @@ import de.esolutions.hmi.widgets.audi.base.eal.TextureDescription;
  *
  * Threads, following the turn panel's rules (Cockpit-drawing.md):
  *  - tt-tele-rx (TeleLink) receives the datagrams.
- *  - tt-tele-tick, 20 Hz: copies the values into the layout, builds it, draws every picture the
+ *  - tt-tele-tick, up to 30 Hz: copies the values into the layout, builds it, draws every picture the
  *    frame needs that is not cached yet (quads, icons, solid blocks) and posts one TeleJob when the
  *    picture changed. At most one job is in flight.
  *  - The HMI thread (TeleJob) only creates nodes, uploads pictures drawn earlier and changes
@@ -34,6 +34,7 @@ import de.esolutions.hmi.widgets.audi.base.eal.TextureDescription;
  *   /mnt/app/root/tt/tele-on   flash: on at every start
  *   /tmp/tt-tele-demo    sweeping fake values, no OpenHaldex needed (the UDP port stays closed)
  *   /tmp/tt-tele-rot     tilted text and icons: -deg (default, right on the car), deg, rad, -rad, off
+ *   /tmp/tt-tele-font    text size in percent of the layout's (default 70, see fontPct)
  * Shows only while the map tab or the small view's map area is up. Playback "tele ..." lines:
  * apply N | info.
  *
@@ -47,6 +48,7 @@ public final class TeleView implements Runnable {
     private static final File OFF_FILE = new File("/tmp/tt-tele-off");
     private static final File DEMO_FILE = new File("/tmp/tt-tele-demo");
     private static final File ROT_FILE = new File("/tmp/tt-tele-rot");
+    private static final File FONT_FILE = new File("/tmp/tt-tele-font");
     /** Above the turn panel's 225, so the autocross view covers it. */
     private static final int VIEWPORT_INDEX = 228;
     private static final int SOLID = 8;
@@ -60,6 +62,12 @@ public final class TeleView implements Runnable {
     private static volatile float rotScale = 1f;
     private static volatile float rotSign = 1f;
     private static volatile boolean rotOff;
+    /**
+     * The car's font at a given size is about 1.45x the preview's (tele1 photos: cap height about
+     * the size itself), so texts are drawn at this fraction of the layout's size, baseline kept.
+     * /tmp/tt-tele-font holds a percentage to try others.
+     */
+    private static volatile int fontPct = 70;
     private static volatile int rotGen;
     private static long lastPress;
     private static long jobs;
@@ -109,7 +117,7 @@ public final class TeleView implements Runnable {
         long lastFiles = 0;
         long lastMap = 0;
         for (;;) {
-            sleep(50L);
+            sleep(33L); // up to 30 frames/s; one job in flight at a time
             long now = System.currentTimeMillis();
             try {
                 if (now - lastFiles >= 1000L) {
@@ -219,7 +227,7 @@ public final class TeleView implements Runnable {
             if (f.kind[i] == TeleLayout.BOX) {
                 px = solid(f.rgba[i]);
             } else if (f.kind[i] == TeleLayout.ICON) {
-                px = argbToRgba(TeleIcons.argb(f.size[i], f.w[i], f.rgba[i] >>> 8), f.rgba[i] & 0xFF);
+                px = argbToRgba(TeleIcons.argb(f.size[i], f.w[i], f.h[i], f.rgba[i] >>> 8), f.rgba[i] & 0xFF);
             } else {
                 px = quad(f, i, quadScale(f, i));
             }
@@ -233,7 +241,7 @@ public final class TeleView implements Runnable {
             return new Long(0x100000000L | (c & 0xFFFFFFFFL));
         }
         if (f.kind[i] == TeleLayout.ICON) {
-            return new Long(((long) (2 + f.size[i] * 1000 + f.w[i]) << 32) | (c & 0xFFFFFFFFL));
+            return new Long(((long) (2 + f.size[i] * 1000000 + f.w[i] * 1000 + f.h[i]) << 32) | (c & 0xFFFFFFFFL));
         }
         if (f.kind[i] == TeleLayout.QUAD) {
             return new Long(((long) (100000 + i) << 32) | (c & 0xFFFFFFFFL));
@@ -456,7 +464,7 @@ public final class TeleView implements Runnable {
             th = SOLID;
         } else if (f.kind[i] == TeleLayout.ICON) {
             tw = f.w[i];
-            th = f.w[i];
+            th = f.h[i];
         } else {
             int sc = quadScale(f, i);
             tw = (f.w[i] + sc - 1) / sc;
@@ -472,7 +480,8 @@ public final class TeleView implements Runnable {
     private static void text(EALManager m, TeleSlot s, TeleFrame f, int i) {
         String str = f.text[i];
         int size = f.size[i];
-        IWrappedFont font = font(f.bold[i] ? 2 : 1, size);
+        int fs = Math.max(8, size * fontPct / 100);
+        IWrappedFont font = font(f.bold[i] ? 2 : 1, fs);
         if (font == null || str == null) {
             return;
         }
@@ -497,7 +506,7 @@ public final class TeleView implements Runnable {
         if (changed || f.x[i] != s.sx || f.y[i] != s.sy || rot != s.shownRot) {
             float dx = 0f;
             if (f.align[i] != TeleLayout.LEFT) {
-                int tw = textW(m, str, font, size);
+                int tw = textW(m, str, font, fs);
                 dx = f.align[i] == TeleLayout.CENTER ? -tw / 2f : -tw;
             }
             if (rot != 0f) {
@@ -585,6 +594,19 @@ public final class TeleView implements Runnable {
             } else if (r.equals("off")) {
                 off = true;
             }
+        }
+        int fp = 70;
+        String fl = readLine(FONT_FILE);
+        if (fl != null) {
+            try {
+                fp = Math.max(30, Math.min(150, Integer.parseInt(fl)));
+            } catch (NumberFormatException ignored) {
+                // keep 70
+            }
+        }
+        if (fp != fontPct) {
+            fontPct = fp;
+            rotGen = (rotGen + 1) & 0xFFF; // rebuild: text nodes keep the font they were made with
         }
         if (scale != rotScale || sign != rotSign || off != rotOff) {
             rotScale = scale;
