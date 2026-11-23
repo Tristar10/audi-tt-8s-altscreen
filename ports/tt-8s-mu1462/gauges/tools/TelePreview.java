@@ -70,6 +70,7 @@ public class TelePreview {
         panel(g, 1, large, t, TeleLayout.VIEW_LARGE, TeleLayout.PAGE_LIVE, caps[1], masks);
 
         set(t, TeleLayout.CH_RPM, 6620);
+        set(t, TeleLayout.CH_BOOST, 108); // dropping off: the peak marker still shows 1.3
         t.now = 0;
         panel(g, 2, large, t, TeleLayout.VIEW_LARGE, TeleLayout.PAGE_LIVE, caps[2], masks);
 

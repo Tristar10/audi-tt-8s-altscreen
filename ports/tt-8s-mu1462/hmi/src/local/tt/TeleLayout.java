@@ -184,6 +184,11 @@ public final class TeleLayout {
     public final int[] qy = new int[MAX * 4];
 
     private final double[] pa = new double[4];
+    // Boost arc range in kPa above atmosphere, and the peak hold.
+    private static final int BOOST_MIN = -100;
+    private static final int BOOST_MAX = 150;
+    private int peakKpa = BOOST_MIN;
+    private long peakAt;
     private final double[] pb = new double[4];
 
     public void build(int view, int page) {
@@ -351,24 +356,37 @@ public final class TeleLayout {
         bar(GRID_X0 + 54, 295, 126, 12, Math.min(brk, 100), 0, link ? BRAKE_FILL : GREY, -1);
         text(NOTCH_X0 - 8, 289, 24, true, RIGHT, vc, ok(CH_BRAKE) ? withUnit(brk, " bar") : "-", true);
 
-        // Right of the notch: boost, big value and a fat bar from vacuum to boost, zero marked, scale
-        // under it. The fill has a light top edge.
+        // Right of the notch: boost as a turbo-style arc. Segments sweep from vacuum (steel blue)
+        // through zero into boost, warming amber -> orange -> red, with a glow while on boost; a white
+        // marker holds the peak for 3 s; the big value sits inside the arc.
         int kpa = ok(CH_BOOST) ? r(val[CH_BOOST]) : 0;
-        int zero = 40; // percent of the bar: -1.0 .. +1.5 bar
-        int pos = clamp((kpa + 100) * 100 / 250, 0, 100);
+        if (kpa >= peakKpa || now - peakAt > 3000) {
+            peakKpa = kpa;
+            peakAt = now;
+        }
         boolean boosting = link && kpa > 0;
-        int bx = NOTCH_X1 + 12;
-        int bw = GRID_X1 - NOTCH_X1 - 16;
-        icon(bx, 206, 38, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
-        text(GRID_X1 - 44, 196, 54, true, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
-        text(GRID_X1 - 4, 226, 16, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
-        bar(bx, 262, bw, 26, pos, zero, !link ? GREY : kpa >= 0 ? BOOST_FILL : VAC_FILL, zero);
-        int a0 = Math.min(zero, pos);
-        int b0 = Math.max(zero, pos);
-        box(bx + bw * a0 / 100, 262, bw * (b0 - a0) / 100, 4, boosting ? BOOST_HI : GREY, link && kpa > 0);
-        text(bx, 294, 14, true, LEFT, GREY, boostPsi ? "-14" : "-1", true);
-        text(bx + bw * zero / 100, 294, 14, true, CENTER, GREY, "0", true);
-        text(bx + bw * 80 / 100, 294, 14, true, CENTER, GREY, boostPsi ? "14.5" : "1", true);
+        int acx = 968;
+        int acy = 328;
+        int segs = 22;
+        for (int i = 0; i < segs; i++) {
+            int v0 = BOOST_MIN + (BOOST_MAX - BOOST_MIN) * i / segs;
+            int v1 = BOOST_MIN + (BOOST_MAX - BOOST_MIN) * (i + 1) / segs;
+            double a0 = 180 - 180.0 * i / segs;
+            double a1 = 180 - 180.0 * (i + 1) / segs + 2.2;
+            boolean lit = link && (v1 <= 0 ? kpa < v1 : kpa > v0 && v0 >= 0);
+            int c = !lit ? TRACK : v1 <= 0 ? VAC_FILL : boostColour(v0);
+            arcSeg(acx, acy, 104, 120, a0, a1, (c & 0xFFFFFF00) | 0x48, lit && v0 >= 0);
+            arcSeg(acx, acy, 84, 112, a0, a1, c, true);
+        }
+        double az = 180 - 180.0 * (0 - BOOST_MIN) / (BOOST_MAX - BOOST_MIN);
+        arcSeg(acx, acy, 78, 118, az + 0.8, az - 0.8, WHITE, true);
+        double ap = 180 - 180.0 * (clamp(peakKpa, BOOST_MIN, BOOST_MAX) - BOOST_MIN) / (BOOST_MAX - BOOST_MIN);
+        arcSeg(acx, acy, 108, 124, ap + 1.2, ap - 1.2, WHITE, link && peakKpa > 0);
+        text(acx, 250, 50, true, CENTER, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
+        icon(acx - 42, 302, 22, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
+        text(acx - 14, 304, 16, true, LEFT, GREY, boostPsi ? "PSI" : "BAR", true);
+        text(acx - 100, 334, 14, true, CENTER, GREY, boostPsi ? "-14" : "-1", true);
+        text(acx + 100, 334, 14, true, CENTER, GREY, boostPsi ? "+22" : "+1.5", true);
 
         // Temperatures in one row, an icon and a value in each cell, short dividers between.
         int cw = (GRID_X1 - GRID_X0) / T_CH.length;
@@ -378,6 +396,24 @@ public final class TeleLayout {
                 box(cx0 - 1, GRID_Y + 2, 2, 28, LINE, true);
             tempCell(t, cx0 + 12, cx0 + cw - 12, GRID_Y, 30, 32, rpm);
         }
+    }
+
+    /** Boost colour for a segment starting at kpa: amber at zero, through orange, red from 1.2 bar. */
+    private static int boostColour(int kpa) {
+        if (kpa >= 120)
+            return RED;
+        if (kpa < 60)
+            return mix(AMBER, BOOST_FILL, kpa / 60f);
+        return mix(BOOST_FILL, RED, (kpa - 60) / 60f);
+    }
+
+    /** Ring segment around (cx, cy) between angles a0 and a1 (degrees, 0 = right, counter-clockwise). */
+    private void arcSeg(int cx, int cy, int rIn, int rOut, double a0, double a1, int c, boolean v) {
+        double r0 = Math.toRadians(a0);
+        double r1 = Math.toRadians(a1);
+        quad(cx + rd(Math.cos(r0) * rOut), cy - rd(Math.sin(r0) * rOut), cx + rd(Math.cos(r1) * rOut),
+            cy - rd(Math.sin(r1) * rOut), cx + rd(Math.cos(r1) * rIn), cy - rd(Math.sin(r1) * rIn),
+            cx + rd(Math.cos(r0) * rIn), cy - rd(Math.sin(r0) * rIn), c, v);
     }
 
     /** Lit strip colour at rpm: cool white, warming to amber over the last 1500 rpm before shift. */

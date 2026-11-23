@@ -205,9 +205,11 @@ wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker ru
       behind it.
     - Gear in a two-layer red notch under a red line with a soft glow.
     - Left of the notch: rpm, and the driver's inputs under it: accelerator (green bar, percent)
-      and brake pressure (channel 21, red bar full at 100 bar, value in bar). Right of it: boost,
-      big value in bar (user, 2026-11-23; psi as an option) over a fat bar from -1 to +1.5 bar with
-      zero marked and a scale under it; channel 8 is taken as kPa above atmosphere and probably
+      and brake pressure (channel 21, red bar full at 100 bar, value in bar). Right of it: boost as a
+      turbo-style arc from -1 to +1.5 bar (user, 2026-11-23: bar; psi as an option): segments sweep
+      from vacuum (steel blue) through a white zero mark into boost, warming amber, orange, red from
+      1.2 bar, with a glow while on boost; a white marker holds the peak for 3 s; the big value sits
+      inside the arc; channel 8 is taken as kPa above atmosphere and probably
       reads 0 until the second LilyGO.
     - Top-left pocket, tilted along the slope: the active preset with its mode, and a Wi-Fi warning
       icon only while the link is slow (under 10 Hz) or lost. Top-right pocket, tilted: Haldex lock,
