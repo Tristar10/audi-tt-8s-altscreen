@@ -23,7 +23,7 @@ the cockpit map area, like a second AltScreen page.
 | Head-unit test tool `ttlink` | Built for QNX; tested on the PC against the laptop sender: 81 datagrams, 0 lost, acks back, wrong key rejected. Builds on macOS too |
 | Sender in OpenHaldex-S3 (`mmi_link.cpp`) | OpenHaldex branch `one-board-ble`, v1.1.15 (BLE + MMI link on one board, ~86 KB RAM free). Bench-tested on the Mac over a Mac hotspot against OpenHaldex's `mmi_sim.py`: 20 Hz, 0 lost. v1.1.15 fixed a bug where the link never counted as up, so older builds stayed at 1 probe a second |
 | Presets from the MMI | Works on the Mac bench (apply preset 2: ok, channel 22 follows). `ttlink -a` tested on the PC against `gauge-send.py --presets`; not yet against the real board |
-| MMI hotspot gateway | **Blocker found 2026-11-23:** without a mobile data connection the hotspot hands out no gateway (below). OpenHaldex must fall back to `10.173.189.1` |
+| MMI hotspot gateway | Without a mobile data connection the hotspot hands out no gateway (below). OpenHaldex v1.1.16 falls back to (own address & netmask) \| 1 = `10.173.189.1` and accepts replies only from there. Builds and runs; the no-gateway path is first exercised in the car |
 | Link test in the car | Not done |
 | Cockpit text page, wheel double-press | Not started. The dial sketch in `gauges/hmi` is on hold and kept only for its drawing and threading code |
 
@@ -65,8 +65,8 @@ for that:
   empty) to `/tmp/dhcp.opts`, so dnsmasq gives clients **no default gateway**. A script in the app
   image removes that file only when the MMI has an internet connection (or the flag file
   `/eso/hmi/uselocalnet` exists). Without a data plan the ESP32's gateway is `0.0.0.0`.
-  OpenHaldex therefore falls back to 10.173.189.1 when it has no gateway (asked of the Mac
-  session 2026-11-23). Touching `uselocalnet` on the MMI is not the plan: it is persistent and its
+  OpenHaldex therefore falls back to 10.173.189.1 when it has no gateway (v1.1.16, "No gateway"
+  in its `docs/MMI_LINK.md`). Touching `uselocalnet` on the MMI is not the plan: it is persistent and its
   other effects are unknown.
 - The reverse (ESP32 as access point, MMI as client) would need the MMI's client mode. The
   firmware contains `wpa_supplicant`, but nothing shows the MMI using a Wi-Fi client mode, so this
@@ -171,7 +171,7 @@ wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker ru
 | 1 | MMI: turn the Wi-Fi hotspot on and note the SSID and password. Join it with the laptop | Laptop gets a 10.173.189.x address; `ping 10.173.189.1` answers. Note whether the laptop got a gateway (expected: none). If the hotspot will not start without a data plan, stop here |
 | 2 | Copy `ttlink` to `/mnt/app/root/tt/`, then over SSH run `chmod +x` on it and start it with `-v` | `ttlink listening on udp 49160`. If the bind fails, the port is taken: `-p 49161`. Run it by hand for this test, not at boot |
 | 3 | Laptop: `python3 gauge-send.py --host 10.173.189.1 --presets` | Laptop shows acks and rtt; ttlink shows rx, values and the catalog. Typing `2` in ttlink applies preset 2 on the laptop. This proves the path without the ESP32 |
-| 4 | Flash OpenHaldex `one-board-ble` (v1.1.15 or later, with the no-gateway fallback). In the OpenHaldex app enter the MMI hotspot SSID and password | `uaputl sta_list` lists the ESP32; ttlink shows `esp_up_s`, `rssi`, live rpm and the catalog; the app's Wi-Fi page shows the MMI link as linked. Gear, boost and oil pressure may read 0 (that CAN message probably isn't on the Haldex bus) |
+| 4 | OpenHaldex `one-board-ble` **v1.1.16** or later (no-gateway fallback; already flashed on the board). In the OpenHaldex app enter the MMI hotspot SSID and password | The app's More > Wi-Fi > MMI gauge link "Head unit" reads 10.173.189.1 (first real run of the fallback); `uaputl sta_list` lists the ESP32; ttlink shows `esp_up_s`, `rssi`, live rpm and the catalog; the app's Wi-Fi page shows the MMI link as linked. Gear, boost and oil pressure may read 0 (that CAN message probably isn't on the Haldex bus) |
 | 5 | Engine running, parked: rev it; in ttlink type a preset id | rpm follows in ttlink; `reply ... ok` and `active preset` change; the app shows the same preset; Haldex control unaffected |
 
 ## Next, after the link works
