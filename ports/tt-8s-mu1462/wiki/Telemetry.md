@@ -192,8 +192,8 @@ wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker ru
     switching back is instant. Our turn panel hides while the autocross view shows.
   - Classic view (2026-11-23, fourth pass):
     - Rev strip: straight pieces following the cluster housing, up the frame's top-left edge, flat,
-      down the top-right edge. The flat middle is the fattest part (44 px) and ends exactly at the
-      shift point; the slopes taper to 16 px. The scale has three parts: left slope 0-3000 rpm,
+      down the top-right edge. The flat middle is the fattest part (54 px) and ends exactly at the
+      shift point; the slopes taper to 30 px, so every number fits inside. The scale has three parts: left slope 0-3000 rpm,
       middle 3000 rpm to the shift point, right slope shift point to 8000 (room for a higher
       rev limit later). Red zone from 7000: the unlit track there is dark red and its numbers red. Numbers sit inside the strip, dark on the lit
       part. Dark track with hairline edges; lit from cool white warming to amber over the last

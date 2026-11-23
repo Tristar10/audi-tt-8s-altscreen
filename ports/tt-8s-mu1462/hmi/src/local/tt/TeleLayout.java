@@ -116,9 +116,9 @@ public final class TeleLayout {
     // shift point; the slopes taper. The scale is in three parts: the left slope up to MID_RPM, the
     // middle up to the shift point, the right slope from the shift point to barToRpm.
     private static final int[] TP_X = {24, 325, 1057, 1416};
-    private static final int[] TP_Y = {262, 148, 148, 262};
-    private static final int HALF_MIN = 8;
-    private static final int HALF_MAX = 22;
+    private static final int[] TP_Y = {266, 152, 152, 266};
+    private static final int HALF_MIN = 15;
+    private static final int HALF_MAX = 27;
     private static final int TP_SEGS = 120;
     private static final int MID_RPM = 3000;
     // Shift lights: LEDS_SIDE per side under the tab bar, lighting from both ends towards the
@@ -283,9 +283,10 @@ public final class TeleLayout {
             double th = 2 * half(sk0);
             boolean litK = link && rpm > k * 1000 && !(limit && !blink);
             int nc = litK ? DARK_TEXT : k * 1000 >= redlineRpm ? RED : GREY;
-            if (th >= 30 && k * 1000 < barToRpm) {
-                int sz = (int) Math.min(30, th - 12);
-                slopeText(sk0 + 0.5, 0.46 * sz, sz, true, CENTER, nc, Integer.toString(k), true);
+            if (th >= 28) {
+                int sz = (int) Math.min(32, th - 10);
+                double at = k * 1000 >= barToRpm ? sk0 - 14 : sk0 + 0.5; // the last one just inside the end
+                slopeText(at, 0.46 * sz, sz, true, CENTER, nc, Integer.toString(k), true);
             } else {
                 slopeText(sk0 - 6, -(half(sk0) + 6), 18, true, CENTER, k * 1000 >= redlineRpm ? RED : GREY,
                     Integer.toString(k), true);
