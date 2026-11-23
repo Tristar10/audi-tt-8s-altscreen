@@ -18,7 +18,8 @@ public final class TeleIcons {
     public static final int WIFI = 7;
     public static final int PEDAL = 8;
     public static final int TURBO = 9;
-    public static final int COUNT = 10;
+    public static final int BRAKE = 10;
+    public static final int COUNT = 11;
 
     // Shape ops. CAP x0 y0 x1 y1 r (thick line, round ends) | CIRC x y r | RECT x0 y0 x1 y1 |
     // POLY n x0 y0 ... | CUT_CIRC x y r | CUT_RECT x0 y0 x1 y1 | CUT_POLY n x0 y0 ...
@@ -70,6 +71,10 @@ public final class TeleIcons {
         {CIRC, 44, 58, 38, CUT_CIRC, 44, 58, 27, CIRC, 44, 58, 15, CUT_CIRC, 44, 58, 6,
             RECT, 44, 16, 96, 38, CUT_RECT, 54, 24, 96, 31, CUT_CIRC, 44, 58, 27, CIRC, 44, 58, 15,
             CUT_CIRC, 44, 58, 6},
+        // BRAKE: the brake symbol, a ring with an exclamation mark between two brackets
+        {CIRC, 50, 50, 46, CUT_CIRC, 50, 50, 38, CUT_RECT, 24, 0, 76, 100, CUT_RECT, 0, 0, 100, 16,
+            CUT_RECT, 0, 84, 100, 100, CIRC, 50, 50, 30, CUT_CIRC, 50, 50, 22,
+            CAP, 50, 36, 50, 52, 4.5f, CIRC, 50, 63, 4.5f},
     };
 
     private TeleIcons() {

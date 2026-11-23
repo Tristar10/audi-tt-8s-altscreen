@@ -194,8 +194,8 @@ wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker ru
     - Rev strip: straight pieces following the cluster housing, up the frame's top-left edge, flat,
       down the top-right edge. The flat middle is the fattest part (44 px) and ends exactly at the
       shift point; the slopes taper to 16 px. The scale has three parts: left slope 0-3000 rpm,
-      middle 3000 rpm to the shift point, right slope shift point to 7000 (the over-rev zone,
-      stretched so the limiter range reads clearly). Numbers sit inside the strip, dark on the lit
+      middle 3000 rpm to the shift point, right slope shift point to 8000 (room for a higher
+      rev limit later). Red zone from 7000: the unlit track there is dark red and its numbers red. Numbers sit inside the strip, dark on the lit
       part. Dark track with hairline edges; lit from cool white warming to amber over the last
       1500 rpm before the shift point, all red past it, flashing at the limiter; red marks over the
       limiter range on the outer edge.
@@ -204,10 +204,11 @@ wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker ru
       one). From the shift point all flash red, together with the gear notch and the red glow
       behind it.
     - Gear in a two-layer red notch under a red line with a soft glow.
-    - Left of the notch: rpm, and the accelerator pedal (bar and percent) under it. Right of it:
-      boost (value, and a bar from vacuum to boost with a tick at zero; bar by default, psi as an
-      option; channel 8 is taken as kPa above atmosphere and probably reads 0 until the second
-      LilyGO).
+    - Left of the notch: rpm, and the driver's inputs under it: accelerator (green bar, percent)
+      and brake pressure (channel 21, red bar full at 100 bar, value in bar). Right of it: boost,
+      big value in bar (user, 2026-11-23; psi as an option) over a fat bar from -1 to +1.5 bar with
+      zero marked and a scale under it; channel 8 is taken as kPa above atmosphere and probably
+      reads 0 until the second LilyGO.
     - Top-left pocket, tilted along the slope: the active preset with its mode, and a Wi-Fi warning
       icon only while the link is slow (under 10 Hz) or lost. Top-right pocket, tilted: Haldex lock,
       icon and big percent over a bar along the slope with the target tick.

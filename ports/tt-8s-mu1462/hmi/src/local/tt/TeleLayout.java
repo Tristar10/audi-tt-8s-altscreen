@@ -58,6 +58,7 @@ public final class TeleLayout {
     public static final int CH_OIL = 6;
     public static final int CH_IAT = 7;
     public static final int CH_BOOST = 8;
+    public static final int CH_BRAKE = 21;
     public static final int CH_HX_TARGET = 10;
     public static final int CH_HX_ACTUAL = 11;
     public static final int CH_GEAR = 13;
@@ -88,6 +89,9 @@ public final class TeleLayout {
     public static final int PEDAL_FILL = 0x34C759FF;
     public static final int BOOST_FILL = 0xFF5A36FF;
     public static final int VAC_FILL = 0x5A7A99FF;
+    public static final int BRAKE_FILL = 0xFF3B30FF;
+    public static final int REDZONE = 0x4A1210FF;
+    public static final int BOOST_HI = 0xFFA07AFF;
     public static final int HALDEX = 0x2F9BFFFF;
     public static final int PRESET = 0x7FD3FFFF;
     public static final int COLD = 0x5AC8FAFF;
@@ -136,7 +140,9 @@ public final class TeleLayout {
     public int shiftRpm = 6500;
     public int limitRpm = 6800;
     public int barFromRpm = 0;
-    public int barToRpm = 7000;
+    public int barToRpm = 8000;
+    /** Start of the red zone on the strip (the limiter will move above 7000 later). */
+    public int redlineRpm = 7000;
     /** Temperatures in degrees F when true; the car uses C (user, 2026-11-23). */
     public boolean imperial = false;
     /** Boost in psi when true, bar when false. Channel 8 is taken as kPa above atmosphere. */
@@ -252,9 +258,9 @@ public final class TeleLayout {
             int from = sToRpm(s0);
             int c;
             if (limit)
-                c = blink ? RED : TRACK;
+                c = blink ? RED : from >= redlineRpm ? REDZONE : TRACK;
             else if (rpm <= from || !link)
-                c = TRACK;
+                c = from >= redlineRpm ? REDZONE : TRACK;
             else if (over)
                 c = RED;
             else
@@ -276,12 +282,12 @@ public final class TeleLayout {
             double sk0 = rpmToS(k * 1000);
             double th = 2 * half(sk0);
             boolean litK = link && rpm > k * 1000 && !(limit && !blink);
-            int nc = litK ? DARK_TEXT : k * 1000 >= shiftRpm ? RED : GREY;
+            int nc = litK ? DARK_TEXT : k * 1000 >= redlineRpm ? RED : GREY;
             if (th >= 30 && k * 1000 < barToRpm) {
                 int sz = (int) Math.min(30, th - 12);
                 slopeText(sk0 + 0.5, 0.46 * sz, sz, true, CENTER, nc, Integer.toString(k), true);
             } else {
-                slopeText(sk0 - 6, -(half(sk0) + 6), 18, true, CENTER, k * 1000 >= shiftRpm ? RED : GREY,
+                slopeText(sk0 - 6, -(half(sk0) + 6), 18, true, CENTER, k * 1000 >= redlineRpm ? RED : GREY,
                     Integer.toString(k), true);
             }
         }
@@ -330,24 +336,38 @@ public final class TeleLayout {
         slopeText(ba + 50, half(ba + 50) + 32 + 0.82 * 42, 42, true, LEFT, vc,
             ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
 
-        // Left of the notch: rpm, and the accelerator pedal under it.
-        icon(GRID_X0 + 14, 212, 34, TeleIcons.TACH, ICONC, true);
-        text(NOTCH_X0 - 8, 204, 46, true, RIGHT, over ? RED : vc, ok(CH_RPM) ? Integer.toString(rpm) : "-", link);
-        text(NOTCH_X0 - 8, 210, 34, true, RIGHT, AMBER, "NO LINK", !link);
+        // Left of the notch: rpm, and the driver's inputs under it: accelerator (green) and brake
+        // pressure (red, full bar at 100 bar).
+        icon(GRID_X0 + 14, 210, 32, TeleIcons.TACH, ICONC, true);
+        text(NOTCH_X0 - 8, 202, 44, true, RIGHT, over ? RED : vc, ok(CH_RPM) ? Integer.toString(rpm) : "-", link);
+        text(NOTCH_X0 - 8, 208, 34, true, RIGHT, AMBER, "NO LINK", !link);
         int ped = ok(CH_PEDAL) ? clamp(r(val[CH_PEDAL]), 0, 100) : 0;
-        icon(GRID_X0 + 16, 266, 30, TeleIcons.PEDAL, ICONC, true);
-        bar(GRID_X0 + 58, 274, 120, 14, ped, 0, link ? PEDAL_FILL : GREY, -1);
-        text(NOTCH_X0 - 8, 266, 28, true, RIGHT, vc, ok(CH_PEDAL) ? percent(ped) : "-", true);
+        icon(GRID_X0 + 16, 254, 26, TeleIcons.PEDAL, ICONC, true);
+        bar(GRID_X0 + 54, 261, 126, 12, ped, 0, link ? PEDAL_FILL : GREY, -1);
+        text(NOTCH_X0 - 8, 255, 24, true, RIGHT, vc, ok(CH_PEDAL) ? percent(ped) : "-", true);
+        int brk = ok(CH_BRAKE) ? clamp(r(val[CH_BRAKE]), 0, 999) : 0;
+        icon(GRID_X0 + 16, 288, 26, TeleIcons.BRAKE, brk > 0 && link ? BRAKE_FILL : ICONC, true);
+        bar(GRID_X0 + 54, 295, 126, 12, Math.min(brk, 100), 0, link ? BRAKE_FILL : GREY, -1);
+        text(NOTCH_X0 - 8, 289, 24, true, RIGHT, vc, ok(CH_BRAKE) ? withUnit(brk, " bar") : "-", true);
 
-        // Right of the notch: boost, value and a bar from vacuum to boost with a tick at zero.
+        // Right of the notch: boost, big value and a fat bar from vacuum to boost, zero marked, scale
+        // under it. The fill has a light top edge.
         int kpa = ok(CH_BOOST) ? r(val[CH_BOOST]) : 0;
-        int zero = 40; // percent of the bar: -100 kPa .. +150 kPa
+        int zero = 40; // percent of the bar: -1.0 .. +1.5 bar
         int pos = clamp((kpa + 100) * 100 / 250, 0, 100);
-        icon(NOTCH_X1 + 12, 212, 34, TeleIcons.TURBO, ICONC, true);
-        text(GRID_X1 - 46, 204, 46, true, RIGHT, kpa > 0 && link ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
+        boolean boosting = link && kpa > 0;
+        int bx = NOTCH_X1 + 12;
+        int bw = GRID_X1 - NOTCH_X1 - 16;
+        icon(bx, 206, 38, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
+        text(GRID_X1 - 44, 196, 54, true, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
         text(GRID_X1 - 4, 226, 16, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
-        bar(NOTCH_X1 + 12, 274, GRID_X1 - NOTCH_X1 - 16, 14, pos, zero,
-            !link ? GREY : kpa >= 0 ? BOOST_FILL : VAC_FILL, zero);
+        bar(bx, 262, bw, 26, pos, zero, !link ? GREY : kpa >= 0 ? BOOST_FILL : VAC_FILL, zero);
+        int a0 = Math.min(zero, pos);
+        int b0 = Math.max(zero, pos);
+        box(bx + bw * a0 / 100, 262, bw * (b0 - a0) / 100, 4, boosting ? BOOST_HI : GREY, link && kpa > 0);
+        text(bx, 294, 14, true, LEFT, GREY, boostPsi ? "-14" : "-1", true);
+        text(bx + bw * zero / 100, 294, 14, true, CENTER, GREY, "0", true);
+        text(bx + bw * 80 / 100, 294, 14, true, CENTER, GREY, boostPsi ? "14.5" : "1", true);
 
         // Temperatures in one row, an icon and a value in each cell, short dividers between.
         int cw = (GRID_X1 - GRID_X0) / T_CH.length;
@@ -384,6 +404,12 @@ public final class TeleLayout {
         int b = Math.max(fromPct, pct);
         box(x0 + bw * a / 100, y0, bw * (b - a) / 100, bh, c, b > a);
         box(x0 + bw * tickPct / 100 - 1, y0 - 4, 2, bh + 8, GREY, tickPct >= 0);
+    }
+
+    private static String withUnit(int v, String unit) {
+        StringBuffer sb = new StringBuffer();
+        sb.append(v).append(unit);
+        return sb.toString();
     }
 
     private String boost(int kpa) {
