@@ -38,7 +38,7 @@ public class TelePreview {
         BufferedImage small = ImageIO.read(new File(a[1]));
         boolean masks = a.length > 3 && a[3].equals("masks");
         String[] caps = {
-            "1  Classic view, autocross (FL5 +R style): cruising in 2nd",
+            "1  Classic view, autocross (FL5 +R style): cruising in 2nd, 20 Hz link",
             "2  Classic view: shift lights coming on, oil hot (amber)",
             "3  Classic view: past the shift point: lights flash, rev line red, notch glows",
             "4  Sport view, autocross: gear and temperatures (icons: coolant, oil, intake, DSG, Haldex clutch)",

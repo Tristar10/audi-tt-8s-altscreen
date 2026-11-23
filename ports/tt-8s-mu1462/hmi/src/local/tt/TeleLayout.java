@@ -8,11 +8,12 @@ package local.tt;
  * dials, tab bar, bottom bar and the frame over the top corners are drawn above our layer, so the
  * layout keeps clear of them.
  *  - Large (Classic) view, after the FL5 Civic Type R's +R screen: shift lights under the tab bar;
- *    a rev line that rises from the lower left and runs across the top, numbers under it; a red
- *    line across with a notch in the middle holding a big gear; rpm left of the notch, Haldex lock
- *    right of it; the active preset in the pocket inside the rev line's bend (top left), speed top
- *    right (the very top corners are covered by the cluster's frame); temperatures and link status
- *    in a grid at the bottom, one icon per value.
+ *    a rev line in straight pieces following the cluster housing (up the left slope, across, down
+ *    the right slope), numbers under it; a red line across with a notch in the middle holding a big
+ *    gear; rpm left of the notch, Haldex lock right of it; the active preset in the pocket above the
+ *    left slope, link status above the right slope (the very top corners are covered by the
+ *    cluster's frame); the five temperatures in a row at the bottom, one icon per value, in C.
+ *    No speed: the stock speedometer shows it.
  *  - Small (Sport) view: only the map area left of the big rev counter is ours: gear and engine
  *    temperatures, one icon per value.
  *
@@ -90,14 +91,13 @@ public final class TeleLayout {
     private static final int[] T_RED = {115, 140, 70, 125, 110};
     private static final int OIL_COLD = 60;
 
-    // Rev line (large view): a quarter circle from the lower left up into a straight line under the
-    // shift lights. Centre of the curve, its radius, the right end, half the line thickness.
-    private static final int TP_CX = 230;
-    private static final int TP_CY = 252;
-    private static final int TP_R = 110;
-    private static final int TP_X1 = 1404;
+    // Rev line (large view): straight pieces following the cluster housing. It rises along the
+    // frame's top-left edge, runs flat under the shift lights and drops along the top-right edge,
+    // leaving a pocket above each slope. Corner points, half the line thickness, pieces.
+    private static final int[] TP_X = {24, 341, 1038, 1416};
+    private static final int[] TP_Y = {262, 142, 142, 262};
     private static final int TP_HALF = 12;
-    private static final int TP_SEGS = 84;
+    private static final int TP_SEGS = 96;
     // Shift lights: LEDS in a row under the tab bar, LED_STEP rpm apart up to the shift point.
     private static final int LEDS = 13;
     private static final int LED_STEP = 125;
@@ -107,18 +107,18 @@ public final class TeleLayout {
     private static final int NOTCH_X1 = 844;
     private static final int NOTCH_IN = 30;
     private static final int NOTCH_Y = 324;
-    // Telemetry grid between the dials, under the notch.
+    // Temperature row between the dials, under the notch.
     private static final int GRID_X0 = 330;
     private static final int GRID_X1 = 1090;
-    private static final int GRID_Y = 340;
-    private static final int GRID_ROW = 58;
+    private static final int GRID_Y = 362;
 
     // Settings
     public int shiftRpm = 6500;
     public int limitRpm = 6800;
     public int barFromRpm = 0;
     public int barToRpm = 7000;
-    public boolean imperial = true;
+    /** Temperatures in degrees F when true; the car uses C (user, 2026-11-23). */
+    public boolean imperial = false;
 
     // Input: latest values (x1000), whether each is fresh, link state, preset catalog.
     public final int[] val = new int[CHANNELS];
@@ -177,7 +177,7 @@ public final class TeleLayout {
 
         // Shift lights under the tab bar: green, amber, red over the last LEDS * LED_STEP rpm, all
         // red and flashing from the shift point.
-        int lw = 64;
+        int lw = 56;
         int lgap = 12;
         int lx = 720 - (LEDS * (lw + lgap) - lgap) / 2;
         for (int i = 0; i < LEDS; i++) {
@@ -228,10 +228,6 @@ public final class TeleLayout {
                 k * 1000 >= shiftRpm ? RED : GREY, Integer.toString(k), true);
         }
 
-        // Speed, top right under the line.
-        text(1404, 198, 56, true, RIGHT, vc, speed(), true);
-        text(1404, 256, 16, false, RIGHT, GREY, imperial ? "MPH" : "KM/H", true);
-
         // Red line across with the notch; the notch glows brighter from the shift point. Gear in it.
         quad(NOTCH_X0, LINE_Y, NOTCH_X1, LINE_Y, NOTCH_X1 - NOTCH_IN, NOTCH_Y, NOTCH_X0 + NOTCH_IN, NOTCH_Y,
             over ? NOTCH_HOT : NOTCH, true);
@@ -245,9 +241,14 @@ public final class TeleLayout {
         int gc = !link ? GREY : limit && !blink ? RED : WHITE; // the notch carries the shift cue
         text(720, 186, 150, true, CENTER, gc, gear(), true);
 
-        // Top-left pocket, inside the bend of the rev line: the active preset and its mode.
-        text(150, 208, 28, true, LEFT, link ? PRESET : GREY, presetName(), true);
-        text(154, 240, 16, false, LEFT, GREY, presetMode(), true);
+        // Top-left pocket, above the rising slope: the active OpenHaldex preset and its mode.
+        text(60, 116, 32, true, LEFT, link ? PRESET : GREY, presetName(), true);
+        text(62, 154, 18, false, LEFT, GREY, presetMode(), true);
+
+        // Top-right pocket, above the falling slope: the link to OpenHaldex, datagrams per second.
+        boolean slow = link && rateHz >= 0 && rateHz < 10;
+        icon(1226, 114, 34, TeleIcons.WIFI, link && !slow ? ICONC : AMBER, true);
+        text(1390, 116, 32, true, RIGHT, link && !slow ? WHITE : AMBER, linkText(), true);
 
         // Left of the notch: rpm. Right of it: Haldex lock, big percent over a bar with target tick.
         icon(GRID_X0 + 14, 226, 36, TeleIcons.TACH, ICONC, true);
@@ -256,24 +257,14 @@ public final class TeleLayout {
         icon(NOTCH_X1 + 10, 226, 36, TeleIcons.AWD, ICONC, true);
         hxBar(NOTCH_X1 + 10, 284, GRID_X1 - NOTCH_X1 - 16, 20, GRID_X1 - 6, 216, 48);
 
-        // Telemetry grid: 3 columns x 2 rows, an icon and a value in each cell.
-        int cw = (GRID_X1 - GRID_X0) / 3;
-        box(GRID_X0 + cw - 1, GRID_Y, 2, 2 * GRID_ROW - 10, LINE, true);
-        box(GRID_X0 + 2 * cw - 1, GRID_Y, 2, 2 * GRID_ROW - 10, LINE, true);
-        int[] order = {0, 1, 2, 3, 4};
-        for (int n = 0; n < order.length; n++) {
-            int col = n / 2;
-            int row = n % 2;
-            int cx0 = GRID_X0 + col * cw;
-            int yy = GRID_Y + row * GRID_ROW;
-            tempCell(order[n], cx0 + 16, cx0 + cw - 16, yy, 36, 36, rpm);
+        // Temperatures in one row, an icon and a value in each cell.
+        int cw = (GRID_X1 - GRID_X0) / T_CH.length;
+        for (int t = 0; t < T_CH.length; t++) {
+            int cx0 = GRID_X0 + t * cw;
+            if (t > 0)
+                box(cx0 - 1, GRID_Y - 8, 2, 52, LINE, true);
+            tempCell(t, cx0 + 10, cx0 + cw - 10, GRID_Y, 34, 34, rpm);
         }
-        // Last cell: the link to OpenHaldex, datagrams per second.
-        int cx0 = GRID_X0 + 2 * cw;
-        int yy = GRID_Y + GRID_ROW;
-        boolean slow = link && rateHz >= 0 && rateHz < 10;
-        icon(cx0 + 16, yy, 36, TeleIcons.WIFI, link && !slow ? ICONC : AMBER, true);
-        text(cx0 + cw - 16, yy, 36, true, RIGHT, link && !slow ? WHITE : AMBER, linkText(), true);
     }
 
     private String linkText() {
@@ -363,25 +354,33 @@ public final class TeleLayout {
             link ? "NO PRESET LIST YET" : "NO LINK", !link || catN == 0);
     }
 
-    // Rev line geometry: arc length -> point (o[0], o[1]) and outward normal (o[2], o[3]).
+    // Rev line geometry: length along the corner points -> point (o[0], o[1]) and outward normal
+    // (o[2], o[3]), pointing up, away from the centre of the screen.
     private static double tpLen() {
-        return TP_R * Math.PI / 2 + (TP_X1 - TP_CX);
+        double l = 0;
+        for (int i = 1; i < TP_X.length; i++)
+            l += Math.sqrt(sq(TP_X[i] - TP_X[i - 1]) + sq(TP_Y[i] - TP_Y[i - 1]));
+        return l;
     }
 
     private static void tp(double s, double[] o) {
-        double arc = TP_R * Math.PI / 2;
-        if (s < arc) {
-            double th = Math.PI - s / TP_R;
-            o[0] = TP_CX + TP_R * Math.cos(th);
-            o[1] = TP_CY - TP_R * Math.sin(th);
-            o[2] = Math.cos(th);
-            o[3] = -Math.sin(th);
-        } else {
-            o[0] = TP_CX + (s - arc);
-            o[1] = TP_CY - TP_R;
-            o[2] = 0;
-            o[3] = -1;
+        for (int i = 1; i < TP_X.length; i++) {
+            double dx = TP_X[i] - TP_X[i - 1];
+            double dy = TP_Y[i] - TP_Y[i - 1];
+            double l = Math.sqrt(dx * dx + dy * dy);
+            if (s <= l || i == TP_X.length - 1) {
+                o[0] = TP_X[i - 1] + dx * s / l;
+                o[1] = TP_Y[i - 1] + dy * s / l;
+                o[2] = dy / l;
+                o[3] = -dx / l;
+                return;
+            }
+            s -= l;
         }
+    }
+
+    private static double sq(double d) {
+        return d * d;
     }
 
     /** Piece of the rev line between arc lengths s0..s1, offsets d0..d1 along the outward normal. */
@@ -394,13 +393,6 @@ public final class TeleLayout {
 
     private static int rd(double d) {
         return (int) Math.round(d);
-    }
-
-    private String speed() {
-        if (!ok(CH_SPEED))
-            return "-";
-        int kmh1000 = val[CH_SPEED];
-        return Integer.toString(r(imperial ? kmh1000 / 1000 * 621 + kmh1000 % 1000 * 621 / 1000 : kmh1000));
     }
 
     private String gear() {

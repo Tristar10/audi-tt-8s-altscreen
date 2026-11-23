@@ -191,19 +191,20 @@ wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker ru
   - The map is hidden by our own opaque full-screen layer; CarPlay keeps running underneath, so
     switching back is instant. Our turn panel hides while the autocross view shows.
   - Classic view: 13 shift lights under the tab bar (green, amber, red over the last 1625 rpm, all
-    red and flashing from the shift point). A rev line rising from the lower left and running
-    across under them, 24 px thick, 1..7 under it (white, amber in the last 1000 rpm before the shift point,
-    all red from it, flashing at the limiter; red marks over the limiter range, red tick at the
-    shift point). A red line across with a notch in the middle holding the gear; the notch glows
-    brighter from the shift point. Rpm left of the notch; Haldex lock right of it (big percent over
-    a bar with the target tick). The very top corners of the screen are covered by the cluster's
-    frame, but two pockets below it are free: the active preset and its mode sit inside the bend of
-    the rev line (top left), speed top right. A 3 x 2 grid at the bottom, one icon per value, no
-    labels: coolant, oil, intake, DSG, Haldex clutch temperature, and the link (datagrams per
-    second, amber under 10 Hz, "NO LINK" when nothing arrives).
-    Values turn amber or red out of range, blue when the oil is cold. No G-meter, no stopwatch.
+    red and flashing from the shift point). The rev line (24 px) is made of straight pieces that
+    follow the cluster housing: up along the frame's top-left edge, flat under the shift lights,
+    down along the top-right edge; 1..7 under it (white, amber in the last 1000 rpm before the
+    shift point, all red from it, flashing at the limiter; red marks over the limiter range, red
+    tick at the shift point). The pockets above the two slopes hold the active OpenHaldex preset
+    and its mode (top left) and the link (top right: datagrams per second, amber under 10 Hz,
+    "NO LINK" when nothing arrives). A red line across with a notch in the middle holding the
+    gear; the notch glows brighter from the shift point. Rpm left of the notch, Haldex lock right
+    of it (big percent over a bar with the target tick). The five temperatures in one row at the
+    bottom, one icon per value, no labels: coolant, oil, intake, DSG, Haldex clutch. Values turn
+    amber or red out of range, blue when the oil is cold. No speed (the stock speedometer shows
+    it), no G-meter, no stopwatch.
   - Sport view: gear and the five temperatures with icons, in the map area left of the rev counter.
-  - Defaults (user, 2026-11-23): shift 6500, limiter 6800, imperial.
+  - Defaults (user, 2026-11-23): shift 6500, limiter 6800, temperatures in C.
   - Presets page (kept from the first draft, for later): a panel with the catalog, green mark on the
     active preset, cursor row.
   - Open: how the scroll-wheel double press reaches the HMI (needs a trace in the car).
