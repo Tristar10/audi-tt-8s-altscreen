@@ -181,8 +181,16 @@ wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker ru
   traced yet.
 - Move the receiver into `tt-zoom.jar` (Java, as RgdBus does) and draw the text page with EAL
   text nodes over the map area ([Cockpit drawing](Cockpit-drawing.md)).
-- Pages, proposed: Live (rpm bar with shift zone, huge gear, Haldex bar and preset name, speed,
-  temperatures only when out of range), Last run (peak rpm, limiter hits, max lock, peak temps),
-  Presets (scroll, press to apply). The exact look comes later.
+- Pages, first draft (2026-11-23, waiting for the user's OK): Live and Presets, in both views.
+  Layout code `hmi/src/local/tt/TeleLayout.java` (pure Java, slots of boxes and texts, no EAL);
+  PC preview `gauges/tools/TelePreview.java` draws the same slots over the cockpit photos into
+  `docs/telemetry-preview.png`.
+  - Live: 32-segment rev bar (white, amber in the last 1000 rpm before the shift point, all red
+    from it, whole bar flashing at the limiter; red tick at the shift point), huge gear (red past
+    the shift point), speed and rpm on the right, temperature warnings only when out of range
+    (worst three; "OIL COLD" when running cold), Haldex actual lock bar with a target tick, the
+    active preset. Defaults: shift 6300, limiter 6700, imperial.
+  - Presets: the catalog from OpenHaldex, green mark on the active one, cursor row.
+  - Last run (peak rpm, limiter hits, max lock, peak temps) is not drawn yet.
 - Shift cue: a sound clip played by the head unit. How to play one, and its delay, is not known
   yet.
