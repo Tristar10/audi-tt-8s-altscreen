@@ -192,7 +192,7 @@ wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker ru
     switching back is instant. Our turn panel hides while the autocross view shows.
   - Classic view: 13 shift lights under the tab bar (green, amber, red over the last 1625 rpm, all
     red and flashing from the shift point). A rev line rising from the lower left and running
-    across under them, 1..7 under it (white, amber in the last 1000 rpm before the shift point,
+    across under them, 24 px thick, 1..7 under it (white, amber in the last 1000 rpm before the shift point,
     all red from it, flashing at the limiter; red marks over the limiter range, red tick at the
     shift point). A red line across with a notch in the middle holding the gear; the notch glows
     brighter from the shift point. Rpm left of the notch, the active preset and its mode right of

@@ -94,7 +94,7 @@ public final class TeleLayout {
     private static final int TP_CY = 252;
     private static final int TP_R = 110;
     private static final int TP_X1 = 1404;
-    private static final int TP_HALF = 7;
+    private static final int TP_HALF = 12;
     private static final int TP_SEGS = 84;
     // Shift lights: LEDS in a row under the tab bar, LED_STEP rpm apart up to the shift point.
     private static final int LEDS = 13;
@@ -220,7 +220,7 @@ public final class TeleLayout {
             if (k == 0)
                 continue;
             tp(len * (k * 1000 - barFromRpm) / span, pa);
-            text((int) Math.round(pa[0] - pa[2] * 30), (int) Math.round(pa[1] - pa[3] * 30) - 11, 22, true, CENTER,
+            text((int) Math.round(pa[0] - pa[2] * 36), (int) Math.round(pa[1] - pa[3] * 36) - 11, 22, true, CENTER,
                 k * 1000 >= shiftRpm ? RED : GREY, Integer.toString(k), true);
         }
 
