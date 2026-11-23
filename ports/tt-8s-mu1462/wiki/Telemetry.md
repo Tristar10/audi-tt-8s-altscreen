@@ -7,11 +7,11 @@ the cockpit map area, like a second AltScreen page.
 
 ## Goal (user, 2026-11-22)
 
-- **Text, not dials.** Dials take too much room.
-- **Shown where the maps go:** drawn over the map area as its own page. Pressing the scroll wheel
-  twice switches between the map and this page.
-- **Large view: our own cluster.** A big rev counter across the top, a big gear number, and
-  telemetry lines. The exact look comes later.
+- **Autocross view instead of the map** (user, 2026-11-23): when it is on, no map shows and the
+  information fills the cockpit, keeping clear of the stock dials. A **long press** on the scroll
+  wheel switches it on and off.
+- **Classic (large) view:** the rev counter and shift light big and in the centre.
+- **Sport (small) view:** only gear and engine information for now.
 - **First milestone: the link.** OpenHaldex connects to the MMI and basic data arrives. The UI
   comes after that.
 
@@ -181,16 +181,25 @@ wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker ru
   traced yet.
 - Move the receiver into `tt-zoom.jar` (Java, as RgdBus does) and draw the text page with EAL
   text nodes over the map area ([Cockpit drawing](Cockpit-drawing.md)).
-- Pages, first draft (2026-11-23, waiting for the user's OK): Live and Presets, in both views.
-  Layout code `hmi/src/local/tt/TeleLayout.java` (pure Java, slots of boxes and texts, no EAL);
+- Autocross view, second draft (2026-11-23, waiting for the user's OK). Layout code
+  `hmi/src/local/tt/TeleLayout.java` (pure Java, slots of boxes, arc segments and texts, no EAL);
   PC preview `gauges/tools/TelePreview.java` draws the same slots over the cockpit photos into
-  `docs/telemetry-preview.png`.
-  - Live: 32-segment rev bar (white, amber in the last 1000 rpm before the shift point, all red
-    from it, whole bar flashing at the limiter; red tick at the shift point), huge gear (red past
-    the shift point), speed and rpm on the right, temperature warnings only when out of range
-    (worst three; "OIL COLD" when running cold), Haldex actual lock bar with a target tick, the
-    active preset. Defaults: shift 6300, limiter 6700, imperial.
-  - Presets: the catalog from OpenHaldex, green mark on the active one, cursor row.
-  - Last run (peak rpm, limiter hits, max lock, peak temps) is not drawn yet.
+  `docs/telemetry-preview.png`, clipped by the stock dials, tab bar and bottom bar, which the
+  cluster draws above our layer (a slot cut by them is a collision).
+  - The map is hidden by our own opaque full-screen layer; CarPlay keeps running underneath, so
+    switching back is instant. Our turn panel hides while the autocross view shows.
+  - Classic view: 36-segment rev arc in the centre (white, amber in the last 1000 rpm before the
+    shift point, all red from it, the whole arc flashing at the limiter; red tick at the shift
+    point), the gear inside it (red past the shift point) with rpm under it, 15 shift lights under
+    the tab bar (green, amber, red over the last 1500 rpm, all red and flashing from the shift
+    point). Engine temperatures top left, Haldex (preset, lock bar with target tick, clutch
+    temperature) top right. Temperatures turn amber or red out of range, blue when the oil is
+    cold. The stock speedometer stays, so no speed of our own.
+  - Sport view: gear and five engine temperatures in the map area left of the rev counter.
+  - Defaults: shift 6300, limiter 6700, imperial.
+  - Presets page (kept from the first draft, for later): a panel with the catalog, green mark on the
+    active preset, cursor row.
+  - Open: how the long press reaches the HMI (needs a trace in the car), and the gear (channel 13
+    probably reads 0 in the car; it can be worked out from rpm and speed instead).
 - Shift cue: a sound clip played by the head unit. How to play one, and its delay, is not known
   yet.
