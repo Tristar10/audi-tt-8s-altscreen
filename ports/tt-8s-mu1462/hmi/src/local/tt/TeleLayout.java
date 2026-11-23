@@ -4,19 +4,23 @@ package local.tt;
  * Layout of the OpenHaldex autocross view (wiki/Telemetry.md). Pure Java, no EAL.
  *
  * The autocross view replaces the map: a long press on the scroll wheel switches it on and off.
- * It fills the whole cockpit screen with an opaque background, so no map shows; the cluster's own
- * dials, tab bar and bottom bar are drawn above our layer, so the layout keeps clear of them.
- *  - Large (Classic) view: a big rev arc in the centre with the gear inside it, a shift light row
- *    under the tab bar, engine temperatures top left, Haldex top right.
+ * It fills the whole cockpit screen with an opaque background, so no map shows. The cluster's own
+ * dials, tab bar, bottom bar and the frame over the top corners are drawn above our layer, so the
+ * layout keeps clear of them.
+ *  - Large (Classic) view, after the FL5 Civic Type R's +R screen: shift lights under the tab bar;
+ *    a rev line that rises from the lower left and runs across the top, numbers under it; a red
+ *    line across with a notch in the middle holding a big gear; rpm left of the notch, the active
+ *    preset right of it, speed top right; telemetry in a grid at the bottom, one icon per value.
  *  - Small (Sport) view: only the map area left of the big rev counter is ours: gear and engine
- *    temperatures.
+ *    temperatures, one icon per value.
  *
- * build() turns the latest values into a list of slots: filled boxes, filled quads (arc segments)
- * and texts. The same view and page always give the same slots in the same order, so the HMI side
- * can create one EAL node per slot when the view or page changes, and per frame only change
- * visibility, text, colour and box width (no texture upload per frame, see Cockpit-drawing.md).
- * A quad is drawn into its own small picture once, one picture per colour it can take. The PC
- * preview (gauges/tools/TelePreview.java) draws the same slots with AWT.
+ * build() turns the latest values into a list of slots: filled boxes, filled quads (rev line
+ * pieces, notch), icons (TeleIcons) and texts. The same view and page always give the same slots
+ * in the same order, so the HMI side can create one EAL node per slot when the view or page
+ * changes, and per frame only change visibility, text, colour and box width (no texture upload
+ * per frame, see Cockpit-drawing.md). Quads and icons are drawn into their own small pictures
+ * once, one picture per colour they can take. The PC preview (gauges/tools/TelePreview.java)
+ * draws the same slots with AWT.
  *
  * Coordinates are cockpit screen pixels (1440x540). A text slot's y is the top of the text; the
  * car places text by baseline at y + 0.82 * size. Colours are 0xRRGGBBAA, like EAL text colours.
@@ -31,10 +35,11 @@ public final class TeleLayout {
     public static final int BOX = 0;
     public static final int TEXT = 1;
     public static final int QUAD = 2;
+    public static final int ICON = 3;
     public static final int LEFT = 0;
     public static final int CENTER = 1;
     public static final int RIGHT = 2;
-    public static final int MAX = 160;
+    public static final int MAX = 200;
     public static final int CHANNELS = 64;
     public static final int MAXPRESET = 8;
     public static final int SCREEN_W = 1440;
@@ -56,11 +61,15 @@ public final class TeleLayout {
     public static final int BG = 0x000000FF;
     public static final int PANEL = 0x0B0F14FF;
     public static final int DIM = 0x262D35FF;
+    public static final int LINE = 0x3A424BFF;
     public static final int WHITE = 0xF2F5F7FF;
     public static final int GREY = 0x8A949EFF;
+    public static final int ICONC = 0xB8C0C8FF;
     public static final int GREEN = 0x34C759FF;
     public static final int AMBER = 0xFFB020FF;
     public static final int RED = 0xFF3B30FF;
+    public static final int NOTCH = 0x3A0A07FF;
+    public static final int NOTCH_HOT = 0x8A1A10FF;
     public static final int HALDEX = 0x2F9BFFFF;
     public static final int PRESET = 0x7FD3FFFF;
     public static final int COLD = 0x5AC8FAFF;
@@ -70,29 +79,42 @@ public final class TeleLayout {
     private static final String[] MODES = {"STOCK", "FWD", "50:50", "60:40", "70:30", "80:20", "90:10",
         "SPEED", "THROTTLE", "MAP", "RPM"};
 
-    // Engine temperatures, degrees C: amber and red limits. Haldex clutch limits are guesses until
-    // we see real values.
+    // Temperatures, degrees C: channel, icon, amber and red limits. Haldex clutch limits are
+    // guesses until we see real values.
     private static final int[] T_CH = {CH_COOLANT, CH_OIL, CH_IAT, CH_DSG, CH_CLUTCH};
-    private static final String[] T_NAME = {"COOLANT", "OIL", "INTAKE", "DSG", "CLUTCH"};
+    private static final int[] T_ICON = {TeleIcons.COOLANT, TeleIcons.OIL, TeleIcons.IAT, TeleIcons.DSG,
+        TeleIcons.CLUTCH};
     private static final int[] T_AMBER = {108, 130, 55, 110, 90};
     private static final int[] T_RED = {115, 140, 70, 125, 110};
     private static final int OIL_COLD = 60;
 
-    // Rev arc (large view): centre, radii, start and end angle (degrees, 0 = right, counter-clockwise).
-    private static final int ARC_CX = 720;
-    private static final int ARC_CY = 470;
-    private static final int ARC_OUT = 330;
-    private static final int ARC_IN = 268;
-    private static final double ARC_FROM = 162;
-    private static final double ARC_TO = 18;
-    private static final int ARC_SEGS = 36;
-    private static final int LEDS = 15;
-    private static final int LED_STEP = 100; // rpm per shift light before the shift point
+    // Rev line (large view): a quarter circle from the lower left up into a straight line under the
+    // shift lights. Centre of the curve, its radius, the right end, half the line thickness.
+    private static final int TP_CX = 230;
+    private static final int TP_CY = 252;
+    private static final int TP_R = 110;
+    private static final int TP_X1 = 1404;
+    private static final int TP_HALF = 7;
+    private static final int TP_SEGS = 84;
+    // Shift lights: LEDS in a row under the tab bar, LED_STEP rpm apart up to the shift point.
+    private static final int LEDS = 13;
+    private static final int LED_STEP = 125;
+    // Red line and the notch holding the gear.
+    private static final int LINE_Y = 200;
+    private static final int NOTCH_X0 = 596;
+    private static final int NOTCH_X1 = 844;
+    private static final int NOTCH_IN = 30;
+    private static final int NOTCH_Y = 324;
+    // Telemetry grid between the dials, under the notch.
+    private static final int GRID_X0 = 330;
+    private static final int GRID_X1 = 1090;
+    private static final int GRID_Y = 340;
+    private static final int GRID_ROW = 58;
 
     // Settings
     public int shiftRpm = 6300;
     public int limitRpm = 6700;
-    public int barFromRpm = 1000;
+    public int barFromRpm = 0;
     public int barToRpm = 7000;
     public boolean imperial = true;
 
@@ -117,6 +139,7 @@ public final class TeleLayout {
     public final int[] w = new int[MAX];
     public final int[] h = new int[MAX];
     public final int[] rgba = new int[MAX];
+    /** Text size in px; for an ICON slot the TeleIcons id. */
     public final int[] size = new int[MAX];
     public final int[] align = new int[MAX];
     public final boolean[] bold = new boolean[MAX];
@@ -125,6 +148,9 @@ public final class TeleLayout {
     /** Quad corners, 4 per slot (qx[4 * i + k]); x/y/w/h hold the quad's bounding box. */
     public final int[] qx = new int[MAX * 4];
     public final int[] qy = new int[MAX * 4];
+
+    private final double[] pa = new double[4];
+    private final double[] pb = new double[4];
 
     public void build(int view, int page) {
         boolean large = view == VIEW_LARGE;
@@ -143,11 +169,12 @@ public final class TeleLayout {
         boolean blink = (now / 100) % 2 == 0;
         boolean over = link && rpm >= shiftRpm;
         boolean limit = link && rpm >= limitRpm;
+        int vc = link ? WHITE : GREY;
 
-        // Shift lights under the tab bar: green, amber, red in the last 1500 rpm, all red and
-        // flashing from the shift point.
-        int lw = 30;
-        int lgap = 6;
+        // Shift lights under the tab bar: green, amber, red over the last LEDS * LED_STEP rpm, all
+        // red and flashing from the shift point.
+        int lw = 64;
+        int lgap = 12;
         int lx = 720 - (LEDS * (lw + lgap) - lgap) / 2;
         for (int i = 0; i < LEDS; i++) {
             int on = shiftRpm - (LEDS - i) * LED_STEP;
@@ -155,21 +182,21 @@ public final class TeleLayout {
             if (over)
                 c = blink ? RED : DIM;
             else if (link && rpm >= on)
-                c = i < 5 ? GREEN : i < 10 ? AMBER : RED;
+                c = i < 4 ? GREEN : i < 9 ? AMBER : RED;
             else
                 c = DIM;
-            box(lx + i * (lw + lgap), 102, lw, 26, c, true);
+            box(lx + i * (lw + lgap), 100, lw, 22, c, true);
         }
 
-        // Rev arc: white, amber in the last 1000 rpm before the shift point, all red from it, the
-        // whole arc flashing at the limiter. Red tick at the shift point, 1..7 inside.
+        // Rev line: white, amber in the last 1000 rpm before the shift point, all red from it, the
+        // whole line flashing at the limiter. Red marks over the limiter range, a red tick at the
+        // shift point, 1..7 under the line.
+        double len = tpLen();
         int span = barToRpm - barFromRpm;
-        double sweep = ARC_FROM - ARC_TO;
-        double gapDeg = 1.4;
-        for (int i = 0; i < ARC_SEGS; i++) {
-            double a0 = ARC_FROM - sweep * i / ARC_SEGS;
-            double a1 = ARC_FROM - sweep * (i + 1) / ARC_SEGS + gapDeg;
-            int from = barFromRpm + span * i / ARC_SEGS;
+        for (int i = 0; i < TP_SEGS; i++) {
+            double s0 = len * i / TP_SEGS;
+            double s1 = len * (i + 1) / TP_SEGS - 2;
+            int from = barFromRpm + span * i / TP_SEGS;
             int c;
             if (limit)
                 c = blink ? RED : DIM;
@@ -181,38 +208,63 @@ public final class TeleLayout {
                 c = AMBER;
             else
                 c = WHITE;
-            ring(a0, a1, ARC_IN, ARC_OUT, c, true);
+            band(s0, s1, -TP_HALF, TP_HALF, c, true);
         }
-        if (shiftRpm > barFromRpm && shiftRpm < barToRpm) {
-            double a = ARC_FROM - sweep * (shiftRpm - barFromRpm) / span;
-            ring(a + 0.5, a - 0.5, ARC_IN - 10, ARC_OUT + 10, RED, true);
-        } else {
-            ring(0, 0, 0, 0, RED, false);
-        }
+        double sl = len * (limitRpm - barFromRpm) / span;
+        for (int i = 0; i < 4; i++)
+            band(sl + (len - sl) * i / 4, sl + (len - sl) * (i + 1) / 4 - 3, TP_HALF + 4, TP_HALF + 9, RED,
+                limitRpm < barToRpm);
+        double ss = len * (shiftRpm - barFromRpm) / span;
+        band(ss - 1.5, ss + 1.5, -TP_HALF - 7, TP_HALF + 7, RED, shiftRpm > barFromRpm && shiftRpm < barToRpm);
         for (int k = (barFromRpm + 999) / 1000; k * 1000 <= barToRpm; k++) {
-            double a = Math.toRadians(ARC_FROM - sweep * (k * 1000 - barFromRpm) / span);
-            int px = ARC_CX + (int) Math.round(Math.cos(a) * 240);
-            int py = ARC_CY - (int) Math.round(Math.sin(a) * 240);
-            text(px, py - 12, 24, true, CENTER, k * 1000 >= shiftRpm ? RED : GREY, Integer.toString(k), true);
+            if (k == 0)
+                continue;
+            tp(len * (k * 1000 - barFromRpm) / span, pa);
+            text((int) Math.round(pa[0] - pa[2] * 30), (int) Math.round(pa[1] - pa[3] * 30) - 11, 22, true, CENTER,
+                k * 1000 >= shiftRpm ? RED : GREY, Integer.toString(k), true);
         }
 
-        // Gear inside the arc, red from the shift point, flashing at the limiter; rpm under it.
-        int gc = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
-        text(ARC_CX, 222, 230, true, CENTER, gc, gear(), true);
-        text(ARC_CX, 420, 34, true, CENTER, over ? RED : WHITE, Integer.toString(rpm), link && ok(CH_RPM));
-        text(ARC_CX, 422, 30, true, CENTER, AMBER, "NO LINK", !link);
+        // Speed, top right under the line.
+        text(1404, 198, 56, true, RIGHT, vc, speed(), true);
+        text(1404, 256, 16, false, RIGHT, GREY, imperial ? "MPH" : "KM/H", true);
 
-        // Engine temperatures, top left (above the small rev counter).
-        text(40, 100, 18, true, LEFT, GREY, "ENGINE", true);
-        temps(40, 404, 126, 38, 4, 20, 32, rpm);
+        // Red line across with the notch; the notch glows brighter from the shift point. Gear in it.
+        quad(NOTCH_X0, LINE_Y, NOTCH_X1, LINE_Y, NOTCH_X1 - NOTCH_IN, NOTCH_Y, NOTCH_X0 + NOTCH_IN, NOTCH_Y,
+            over ? NOTCH_HOT : NOTCH, true);
+        box(GRID_X0, LINE_Y - 1, NOTCH_X0 - GRID_X0 + 2, 3, RED, true);
+        box(NOTCH_X1 - 2, LINE_Y - 1, GRID_X1 - NOTCH_X1 + 2, 3, RED, true);
+        quad(NOTCH_X0 - 1, LINE_Y, NOTCH_X0 + 2, LINE_Y, NOTCH_X0 + NOTCH_IN + 2, NOTCH_Y,
+            NOTCH_X0 + NOTCH_IN - 1, NOTCH_Y, RED, true);
+        quad(NOTCH_X1 - 2, LINE_Y, NOTCH_X1 + 1, LINE_Y, NOTCH_X1 - NOTCH_IN + 1, NOTCH_Y,
+            NOTCH_X1 - NOTCH_IN - 2, NOTCH_Y, RED, true);
+        box(NOTCH_X0 + NOTCH_IN - 1, NOTCH_Y - 1, NOTCH_X1 - NOTCH_X0 - 2 * NOTCH_IN + 2, 3, RED, true);
+        int gc = !link ? GREY : limit && !blink ? RED : WHITE; // the notch carries the shift cue
+        text(720, 186, 150, true, CENTER, gc, gear(), true);
 
-        // Haldex, top right (above the speedometer): preset, lock bar with target tick, clutch temp.
-        int hx = 1036;
-        int hr = 1404;
-        text(hx, 100, 18, true, LEFT, GREY, "HALDEX", true);
-        text(hr, 96, 30, true, RIGHT, link ? PRESET : GREY, presetName(), true);
-        hxBar(hx, 150, 270, 26, hr, 30);
-        temps(hx, hr, 204, 38, 1, 20, 32, rpm, 4);
+        // Left of the notch: rpm. Right of it: the active preset and its mode.
+        icon(GRID_X0 + 14, 226, 36, TeleIcons.TACH, ICONC, true);
+        text(NOTCH_X0 - 6, 216, 48, true, RIGHT, over ? RED : vc, ok(CH_RPM) ? Integer.toString(rpm) : "-", link);
+        text(NOTCH_X0 - 6, 216, 34, true, RIGHT, AMBER, "NO LINK", !link);
+        text(NOTCH_X1 + 6, 214, 34, true, LEFT, link ? PRESET : GREY, presetName(), true);
+        text(NOTCH_X1 + 8, 256, 18, false, LEFT, GREY, presetMode(), true);
+
+        // Telemetry grid: 3 columns x 2 rows, an icon and a value in each cell.
+        int cw = (GRID_X1 - GRID_X0) / 3;
+        box(GRID_X0 + cw - 1, GRID_Y, 2, 2 * GRID_ROW - 10, LINE, true);
+        box(GRID_X0 + 2 * cw - 1, GRID_Y, 2, 2 * GRID_ROW - 10, LINE, true);
+        int[] order = {0, 1, 2, 3, 4};
+        for (int n = 0; n < order.length; n++) {
+            int col = n / 2;
+            int row = n % 2;
+            int cx0 = GRID_X0 + col * cw;
+            int yy = GRID_Y + row * GRID_ROW;
+            tempCell(order[n], cx0 + 16, cx0 + cw - 16, yy, 36, 36, rpm);
+        }
+        // Last cell: Haldex lock, bar with target tick and percent.
+        int cx0 = GRID_X0 + 2 * cw;
+        int yy = GRID_Y + GRID_ROW;
+        icon(cx0 + 16, yy, 36, TeleIcons.AWD, ICONC, true);
+        hxBar(cx0 + 62, yy + 8, cw - 62 - 92, 20, cx0 + cw - 16, 32);
     }
 
     private void liveSmall() {
@@ -223,39 +275,30 @@ public final class TeleLayout {
         boolean over = link && rpm >= shiftRpm;
         boolean limit = link && rpm >= limitRpm;
         int gc = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
-        text(130, 124, 18, true, CENTER, GREY, "GEAR", true);
         text(130, 150, 230, true, CENTER, gc, gear(), true);
         text(130, 392, 26, true, CENTER, AMBER, "NO LINK", !link);
-        text(250, 124, 18, true, LEFT, GREY, "ENGINE", true);
-        temps(250, 490, 150, 46, 5, 20, 34, rpm);
+        box(262, 140, 2, 230, LINE, true);
+        for (int t = 0; t < T_CH.length; t++)
+            tempCell(t, 284, 490, 140 + t * 48, 34, 34, rpm);
     }
 
-    /** Rows of label (left) and value (right), coloured by level. First temp index optional. */
-    private void temps(int lx, int rx, int top, int step, int rows, int ls, int vs, int rpm) {
-        temps(lx, rx, top, step, rows, ls, vs, rpm, 0);
-    }
-
-    private void temps(int lx, int rx, int top, int step, int rows, int ls, int vs, int rpm, int first) {
-        for (int i = 0; i < rows; i++) {
-            int t = first + i;
-            int ch = T_CH[t];
-            String name = T_NAME[t];
-            String v = "-";
-            int c = link ? WHITE : GREY;
-            if (ok(ch)) {
-                int deg = r(val[ch]);
-                v = temp(deg);
-                if (deg >= T_RED[t])
-                    c = RED;
-                else if (deg >= T_AMBER[t])
-                    c = AMBER;
-                else if (ch == CH_OIL && deg < OIL_COLD && rpm > 400)
-                    c = COLD;
-            }
-            int yy = top + i * step;
-            text(lx, yy + (vs - ls) / 2 + 2, ls, false, LEFT, c == WHITE ? GREY : c, name, true);
-            text(rx, yy, vs, true, RIGHT, c, v, true);
+    /** One temperature: icon at x0, value right-aligned at x1, coloured by level. */
+    private void tempCell(int t, int x0, int x1, int yy, int is, int vs, int rpm) {
+        int ch = T_CH[t];
+        String v = "-";
+        int c = link ? WHITE : GREY;
+        if (ok(ch)) {
+            int deg = r(val[ch]);
+            v = temp(deg);
+            if (deg >= T_RED[t])
+                c = RED;
+            else if (deg >= T_AMBER[t])
+                c = AMBER;
+            else if (ch == CH_OIL && deg < OIL_COLD && rpm > 400)
+                c = COLD;
         }
+        icon(x0, yy, is, T_ICON[t], c == WHITE || c == GREY ? ICONC : c, true);
+        text(x1, yy + (is - vs) / 2, vs, true, RIGHT, c, v, true);
     }
 
     private void hxBar(int x0, int y0, int bw, int bh, int rx, int ps) {
@@ -301,11 +344,61 @@ public final class TeleLayout {
             link ? "NO PRESET LIST YET" : "NO LINK", !link || catN == 0);
     }
 
+    // Rev line geometry: arc length -> point (o[0], o[1]) and outward normal (o[2], o[3]).
+    private static double tpLen() {
+        return TP_R * Math.PI / 2 + (TP_X1 - TP_CX);
+    }
+
+    private static void tp(double s, double[] o) {
+        double arc = TP_R * Math.PI / 2;
+        if (s < arc) {
+            double th = Math.PI - s / TP_R;
+            o[0] = TP_CX + TP_R * Math.cos(th);
+            o[1] = TP_CY - TP_R * Math.sin(th);
+            o[2] = Math.cos(th);
+            o[3] = -Math.sin(th);
+        } else {
+            o[0] = TP_CX + (s - arc);
+            o[1] = TP_CY - TP_R;
+            o[2] = 0;
+            o[3] = -1;
+        }
+    }
+
+    /** Piece of the rev line between arc lengths s0..s1, offsets d0..d1 along the outward normal. */
+    private void band(double s0, double s1, double d0, double d1, int c, boolean v) {
+        tp(s0, pa);
+        tp(s1, pb);
+        quad(rd(pa[0] + pa[2] * d1), rd(pa[1] + pa[3] * d1), rd(pb[0] + pb[2] * d1), rd(pb[1] + pb[3] * d1),
+            rd(pb[0] + pb[2] * d0), rd(pb[1] + pb[3] * d0), rd(pa[0] + pa[2] * d0), rd(pa[1] + pa[3] * d0), c, v);
+    }
+
+    private static int rd(double d) {
+        return (int) Math.round(d);
+    }
+
+    private String speed() {
+        if (!ok(CH_SPEED))
+            return "-";
+        int kmh1000 = val[CH_SPEED];
+        return Integer.toString(r(imperial ? kmh1000 / 1000 * 621 + kmh1000 % 1000 * 621 / 1000 : kmh1000));
+    }
+
     private String gear() {
         if (!ok(CH_GEAR))
             return "-";
         int gv = r(val[CH_GEAR]);
         return gv <= 0 ? "N" : Integer.toString(gv);
+    }
+
+    private int presetIndex() {
+        if (!ok(CH_PRESET))
+            return -1;
+        int id = r(val[CH_PRESET]);
+        for (int i = 0; i < catN; i++)
+            if (catId[i] == id)
+                return i;
+        return -1;
     }
 
     private String presetName() {
@@ -314,12 +407,17 @@ public final class TeleLayout {
         int id = r(val[CH_PRESET]);
         if (id == 255)
             return "NONE";
-        for (int i = 0; i < catN; i++)
-            if (catId[i] == id)
-                return upper(catName[i]);
+        int i = presetIndex();
+        if (i >= 0)
+            return upper(catName[i]);
         StringBuffer sb = new StringBuffer("PRESET ");
         sb.append(id);
         return sb.toString();
+    }
+
+    private String presetMode() {
+        int i = presetIndex();
+        return i >= 0 ? mode(catMode[i]) : "";
     }
 
     private String temp(int c) {
@@ -374,23 +472,23 @@ public final class TeleLayout {
         add(BOX, x0, y0, w0, h0, c, v);
     }
 
-    /** Ring segment between angles a0 and a1 (degrees) and radii rIn..rOut around the arc centre. */
-    private void ring(double a0, double a1, int rIn, int rOut, int c, boolean v) {
+    private void icon(int x0, int y0, int px, int id, int c, boolean v) {
+        int i = add(ICON, x0, y0, px, px, c, v);
+        size[i] = id;
+    }
+
+    private void quad(int x0, int y0, int x1, int y1, int x2, int y2, int x3, int y3, int c, boolean v) {
         int i = add(QUAD, 0, 0, 0, 0, c, v);
-        double r0 = Math.toRadians(a0);
-        double r1 = Math.toRadians(a1);
-        double[] ang = {r0, r1, r1, r0};
-        int[] rad = {rOut, rOut, rIn, rIn};
-        int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE;
+        int[] xs = {x0, x1, x2, x3};
+        int[] ys = {y0, y1, y2, y3};
+        int minX = xs[0], maxX = xs[0], minY = ys[0], maxY = ys[0];
         for (int k = 0; k < 4; k++) {
-            int px = ARC_CX + (int) Math.round(Math.cos(ang[k]) * rad[k]);
-            int py = ARC_CY - (int) Math.round(Math.sin(ang[k]) * rad[k]);
-            qx[4 * i + k] = px;
-            qy[4 * i + k] = py;
-            minX = Math.min(minX, px);
-            minY = Math.min(minY, py);
-            maxX = Math.max(maxX, px);
-            maxY = Math.max(maxY, py);
+            qx[4 * i + k] = xs[k];
+            qy[4 * i + k] = ys[k];
+            minX = Math.min(minX, xs[k]);
+            maxX = Math.max(maxX, xs[k]);
+            minY = Math.min(minY, ys[k]);
+            maxY = Math.max(maxY, ys[k]);
         }
         x[i] = minX;
         y[i] = minY;

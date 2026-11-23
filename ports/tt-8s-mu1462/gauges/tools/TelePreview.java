@@ -38,10 +38,10 @@ public class TelePreview {
         BufferedImage small = ImageIO.read(new File(a[1]));
         boolean masks = a.length > 3 && a[3].equals("masks");
         String[] caps = {
-            "1  Classic view, autocross: cruising in 2nd",
-            "2  Classic view: shift lights coming on, oil hot",
-            "3  Classic view: past the shift point, shift lights flash, arc and gear red",
-            "4  Sport view, autocross: gear and engine temperatures",
+            "1  Classic view, autocross (FL5 +R style): cruising in 2nd",
+            "2  Classic view: shift lights coming on, oil hot (amber)",
+            "3  Classic view: past the shift point: lights flash, rev line red, notch glows",
+            "4  Sport view, autocross: gear and temperatures (icons: coolant, oil, intake, DSG, Haldex clutch)",
             "5  Classic view, presets (later): wheel moves the cursor, press applies"};
         BufferedImage out = new BufferedImage(1440, caps.length * (540 + CAP), BufferedImage.TYPE_INT_RGB);
         Graphics2D g = out.createGraphics();
@@ -86,6 +86,8 @@ public class TelePreview {
             v.subtract(new Area(new Ellipse2D.Double(1220 - 128, 383 - 128, 256, 256))); // speedometer
             v.subtract(new Area(new Rectangle(428, 40, 560, 54))); // tab bar
             v.subtract(new Area(new Rectangle(0, 464, 1440, 76))); // bottom bar
+            v.subtract(new Area(new Polygon(new int[] {0, 290, 0}, new int[] {0, 0, 110}, 3))); // frame, top left
+            v.subtract(new Area(new Polygon(new int[] {1100, 1440, 1440}, new int[] {0, 0, 108}, 3))); // top right
         } else {
             v = new Area(new Polygon(new int[] {0, 200, 520, 520, 0}, new int[] {110, 50, 50, 468, 468}, 5));
             v.subtract(new Area(new Rectangle(180, 30, 300, 38))); // status line (radio, compass)
@@ -161,6 +163,11 @@ public class TelePreview {
                     ys[k] = t.qy[4 * i + k];
                 }
                 g.fillPolygon(xs, ys, 4);
+            } else if (t.kind[i] == TeleLayout.ICON) {
+                int px = t.w[i];
+                BufferedImage ic = new BufferedImage(px, px, BufferedImage.TYPE_INT_ARGB);
+                ic.setRGB(0, 0, px, px, local.tt.TeleIcons.argb(t.size[i], px, c >>> 8), 0, px);
+                g.drawImage(ic, t.x[i], t.y[i], null);
             } else {
                 Font f = new Font(FONT, t.bold[i] ? Font.BOLD : Font.PLAIN, t.size[i]);
                 g.setFont(f);

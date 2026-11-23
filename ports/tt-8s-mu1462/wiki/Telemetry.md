@@ -181,21 +181,25 @@ wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker ru
   traced yet.
 - Move the receiver into `tt-zoom.jar` (Java, as RgdBus does) and draw the text page with EAL
   text nodes over the map area ([Cockpit drawing](Cockpit-drawing.md)).
-- Autocross view, second draft (2026-11-23, waiting for the user's OK). Layout code
-  `hmi/src/local/tt/TeleLayout.java` (pure Java, slots of boxes, arc segments and texts, no EAL);
-  PC preview `gauges/tools/TelePreview.java` draws the same slots over the cockpit photos into
-  `docs/telemetry-preview.png`, clipped by the stock dials, tab bar and bottom bar, which the
-  cluster draws above our layer (a slot cut by them is a collision).
+- Autocross view, third draft (2026-11-23, after the FL5 Civic Type R's +R screen; waiting for the
+  user's OK). Layout code `hmi/src/local/tt/TeleLayout.java` (pure Java: slots of boxes, quads,
+  icons and texts, no EAL), icons `hmi/src/local/tt/TeleIcons.java` (drawn from shapes in code,
+  same pixels on the car and the PC). PC preview `gauges/tools/TelePreview.java` draws the slots
+  over the cockpit photos into `docs/telemetry-preview.png`, clipped by what the cluster draws above
+  our layer: dials, tab bar, bottom bar and the frame over the top corners (the top corners of the
+  screen do not show). A slot cut by them is a collision.
   - The map is hidden by our own opaque full-screen layer; CarPlay keeps running underneath, so
     switching back is instant. Our turn panel hides while the autocross view shows.
-  - Classic view: 36-segment rev arc in the centre (white, amber in the last 1000 rpm before the
-    shift point, all red from it, the whole arc flashing at the limiter; red tick at the shift
-    point), the gear inside it (red past the shift point) with rpm under it, 15 shift lights under
-    the tab bar (green, amber, red over the last 1500 rpm, all red and flashing from the shift
-    point). Engine temperatures top left, Haldex (preset, lock bar with target tick, clutch
-    temperature) top right. Temperatures turn amber or red out of range, blue when the oil is
-    cold. The stock speedometer stays, so no speed of our own.
-  - Sport view: gear and five engine temperatures in the map area left of the rev counter.
+  - Classic view: 13 shift lights under the tab bar (green, amber, red over the last 1625 rpm, all
+    red and flashing from the shift point). A rev line rising from the lower left and running
+    across under them, 1..7 under it (white, amber in the last 1000 rpm before the shift point,
+    all red from it, flashing at the limiter; red marks over the limiter range, red tick at the
+    shift point). A red line across with a notch in the middle holding the gear; the notch glows
+    brighter from the shift point. Rpm left of the notch, the active preset and its mode right of
+    it, speed top right. A 3 x 2 telemetry grid at the bottom, one icon per value, no labels:
+    coolant, oil, intake, DSG, Haldex clutch temperature, Haldex lock bar with target tick.
+    Values turn amber or red out of range, blue when the oil is cold. No G-meter, no stopwatch.
+  - Sport view: gear and the five temperatures with icons, in the map area left of the rev counter.
   - Defaults: shift 6300, limiter 6700, imperial.
   - Presets page (kept from the first draft, for later): a panel with the catalog, green mark on the
     active preset, cursor row.
