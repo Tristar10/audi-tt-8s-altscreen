@@ -322,24 +322,24 @@ public final class TeleLayout {
         // Top-left pocket, along the rising slope: the active OpenHaldex preset, its mode above it,
         // and a Wi-Fi warning only while the link is slow or lost.
         boolean slow = link && rateHz >= 0 && rateHz < 10;
-        double ps = l0 * 0.14;
-        slopeText(ps, half(ps) + 12 + 0.82 * 32, 32, true, LEFT, link ? PRESET : GREY, presetName(), true);
-        slopeText(ps + 18, half(ps) + 52 + 0.82 * 18, 18, true, LEFT, GREY, presetMode(), true);
-        slopeIcon(l0 * 0.72, half(l0 * 0.72) + 14, 28, TeleIcons.WIFI, AMBER, !link || slow);
+        double ps = l0 * 0.08;
+        slopeText(ps, half(ps) + 44 + 0.82 * 32, 32, true, LEFT, link ? PRESET : GREY, presetName(), true);
+        slopeText(ps + 30, half(ps) + 86 + 0.82 * 18, 18, true, LEFT, GREY, presetMode(), true);
+        slopeIcon(l0 * 0.70, half(l0 * 0.70) + 48, 28, TeleIcons.WIFI, AMBER, !link || slow);
 
         // Top-right pocket, along the falling slope: Haldex lock. Icon and big percent, and under
         // them a bar along the slope with the target as a white tick.
         int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
         int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
-        double ba = r0 + 60;
-        double bb = len - 30;
+        double ba = r0 + 90;
+        double bb = len - 10;
         double bf = ba + (bb - ba) * act / 100;
         double bt = ba + (bb - ba) * tgt / 100;
-        bandOff(ba, bb, half(ba) + 12, half(ba) + 22, half(bb) + 12, half(bb) + 22, TRACK, true);
-        bandOff(ba, bf, half(ba) + 12, half(ba) + 22, half(bf) + 12, half(bf) + 22, link ? HALDEX : GREY, act > 0);
-        bandOff(bt - 2, bt + 2, half(bt) + 8, half(bt) + 26, half(bt) + 8, half(bt) + 26, WHITE, ok(CH_HX_TARGET));
-        slopeIcon(ba + 4, half(ba) + 34, 32, TeleIcons.AWD, ICONC, true);
-        slopeText(ba + 50, half(ba + 50) + 32 + 0.82 * 42, 42, true, LEFT, vc,
+        bandOff(ba, bb, half(ba) + 34, half(ba) + 44, half(bb) + 34, half(bb) + 44, TRACK, true);
+        bandOff(ba, bf, half(ba) + 34, half(ba) + 44, half(bf) + 34, half(bf) + 44, link ? HALDEX : GREY, act > 0);
+        bandOff(bt - 2, bt + 2, half(bt) + 30, half(bt) + 48, half(bt) + 30, half(bt) + 48, WHITE, ok(CH_HX_TARGET));
+        slopeIcon(ba + 4, half(ba) + 56, 32, TeleIcons.AWD, ICONC, true);
+        slopeText(ba + 50, half(ba + 50) + 54 + 0.82 * 42, 42, true, LEFT, vc,
             ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
 
         // Left of the notch: rpm, and the driver's inputs under it: accelerator (green) and brake
