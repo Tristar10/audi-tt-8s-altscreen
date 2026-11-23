@@ -40,7 +40,7 @@ public class TelePreview {
         String[] caps = {
             "1  Classic view, autocross (FL5 +R style): cruising in 2nd, 20 Hz link",
             "2  Classic view: shift lights coming on, oil hot (amber)",
-            "3  Classic view: past the shift point: lights flash, rev line red, notch glows",
+            "3  Classic view: past the shift point: lights flash blue, rev line red, notch glows",
             "4  Sport view, autocross: gear and temperatures (icons: coolant, oil, intake, DSG, Haldex clutch)",
             "5  Classic view, presets (later): wheel moves the cursor, press applies"};
         BufferedImage out = new BufferedImage(1440, caps.length * (540 + CAP), BufferedImage.TYPE_INT_RGB);
@@ -153,6 +153,9 @@ public class TelePreview {
             if (!t.vis[i])
                 continue;
             int c = t.rgba[i];
+            java.awt.geom.AffineTransform saved = g.getTransform();
+            if (t.rot[i] != 0)
+                g.rotate(Math.toRadians(t.rot[i]), t.x[i], t.y[i]);
             g.setColor(new Color((c >>> 24) & 0xFF, (c >>> 16) & 0xFF, (c >>> 8) & 0xFF, c & 0xFF));
             if (t.kind[i] == TeleLayout.BOX) {
                 g.fillRect(t.x[i], t.y[i], t.w[i], t.h[i]);
@@ -181,6 +184,7 @@ public class TelePreview {
                     x -= tw;
                 g.drawString(t.text[i], x, t.y[i] + Math.round(0.82f * t.size[i]));
             }
+            g.setTransform(saved);
         }
     }
 }

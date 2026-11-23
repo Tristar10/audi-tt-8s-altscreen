@@ -190,15 +190,19 @@ wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker ru
   screen do not show). A slot cut by them is a collision.
   - The map is hidden by our own opaque full-screen layer; CarPlay keeps running underneath, so
     switching back is instant. Our turn panel hides while the autocross view shows.
-  - Classic view: 13 shift lights under the tab bar (green, amber, red over the last 1625 rpm, all
-    red and flashing from the shift point). The rev line (24 px) is made of straight pieces that
+  - Classic view: 12 shift lights under the tab bar, slanted like the housing's slopes, lighting
+    from both ends towards the middle (green, amber, red over the last 1200 rpm, a soft glow behind
+    each lit one); from the shift point all flash **blue**, so "shift now" never looks like the red
+    zone. The rev line (24 px) is made of straight pieces that
     follow the cluster housing: up along the frame's top-left edge, flat under the shift lights,
     down along the top-right edge; 1..7 under it (white, amber in the last 1000 rpm before the
     shift point, all red from it, flashing at the limiter; red marks over the limiter range, red
-    tick at the shift point). The pockets above the two slopes hold the active OpenHaldex preset
-    and its mode (top left) and the link (top right: datagrams per second, amber under 10 Hz,
-    "NO LINK" when nothing arrives). A red line across with a notch in the middle holding the
-    gear; the notch glows brighter from the shift point. Rpm left of the notch, Haldex lock right
+    tick at the shift point; the numbers on the slopes tilt with them). The pockets above the two
+    slopes hold the active OpenHaldex preset and its mode (top left) and the link (top right: datagrams per second, amber under 10 Hz,
+    "NO LINK" when nothing arrives), both tilted along the slope. Tilted text and icons need EAL
+    `setRotationZ` on the car, untested (the dial sketch never calibrated degrees vs radians or the
+    sign); if it does not work they fall back to level. A red line across with a notch in the middle holding the
+    gear; the notch has two layers for depth and glows brighter from the shift point. Rpm left of the notch, Haldex lock right
     of it (big percent over a bar with the target tick). The five temperatures in one row at the
     bottom, one icon per value, no labels: coolant, oil, intake, DSG, Haldex clutch. Values turn
     amber or red out of range, blue when the oil is cold. No speed (the stock speedometer shows
