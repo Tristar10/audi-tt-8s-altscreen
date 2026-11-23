@@ -41,7 +41,7 @@ public class TelePreview {
             "1  Classic view, autocross (FL5 +R style): braking into a corner in 2nd",
             "2  Classic view: full throttle, shift lights green then blue, oil hot (amber)",
             "3  Classic view: past the shift point: everything flashes red (flash-on frame)",
-            "4  Sport view, autocross: gear and temperatures (icons: coolant, oil, intake, DSG, Haldex clutch)",
+            "4  Sport view: preset and mode, Haldex lock, gear, temperatures, boost",
             "5  Classic view, presets (later): wheel moves the cursor, press applies"};
         BufferedImage out = new BufferedImage(1440, caps.length * (540 + CAP), BufferedImage.TYPE_INT_RGB);
         Graphics2D g = out.createGraphics();

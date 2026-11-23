@@ -220,7 +220,10 @@ wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker ru
       calibrated degrees vs radians or the sign); if it does not work they fall back to level.
     - Not on the screen: speed (the stock speedometer shows it), engine torque (not sent), G-meter,
       stopwatch.
-  - Sport view: gear and the five temperatures with icons, in the map area left of the rev counter.
+  - Sport view, in the map area left of the rev counter (top to bottom): the preset with its mode
+    (and the Wi-Fi warning when the link is slow or lost), a Haldex lock strip with the target tick
+    and percent, the big gear with the five temperatures beside it, and a boost strip from -1 to
+    +1.5 bar with zero marked and the value.
   - Defaults (user, 2026-11-23): shift 6500, limiter 6800, temperatures in C.
   - Presets page (kept from the first draft, for later): a panel with the catalog, green mark on the
     active preset, cursor row.

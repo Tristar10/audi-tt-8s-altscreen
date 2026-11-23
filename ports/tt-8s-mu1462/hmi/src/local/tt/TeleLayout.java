@@ -529,17 +529,46 @@ public final class TeleLayout {
 
     private void liveSmall() {
         // Only the map area left of the big rev counter shows: x 0..520, below a diagonal from
-        // (0,110) to (200,50), above y 440. Gear and engine temperatures.
+        // (0,110) to (200,50) and the stock status line, above y 440. From the top: preset and mode,
+        // a Haldex lock strip, the gear with the temperatures beside it, a boost strip.
         int rpm = ok(CH_RPM) ? r(val[CH_RPM]) : 0;
         boolean blink = (now / 100) % 2 == 0;
         boolean over = link && rpm >= shiftRpm;
         boolean limit = link && rpm >= limitRpm;
+        int vc = link ? WHITE : GREY;
+        int x0 = 24;
+        int x1 = 492;
+
+        text(210, 72, 28, true, LEFT, link ? PRESET : GREY, presetName(), true);
+        text(x1, 80, 16, true, RIGHT, GREY, presetMode(), true);
+        boolean slow = link && rateHz >= 0 && rateHz < 10;
+        icon(170, 76, 24, TeleIcons.WIFI, AMBER, !link || slow);
+
+        // Haldex lock: icon, strip with the target tick, percent.
+        int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
+        int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
+        icon(x0, 112, 28, TeleIcons.AWD, ICONC, true);
+        bar(x0 + 40, 118, 330, 16, act, 0, link ? HALDEX : GREY, -1);
+        box(x0 + 40 + 330 * tgt / 100 - 2, 113, 4, 26, WHITE, ok(CH_HX_TARGET));
+        text(x1, 110, 30, true, RIGHT, vc, ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
+
+        // Gear, red past the shift point, flashing at the limiter; temperatures beside it.
         int gc = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
-        text(130, 150, 230, true, CENTER, gc, gear(), true);
-        text(130, 392, 26, true, CENTER, AMBER, "NO LINK", !link);
-        box(262, 140, 2, 230, LINE, true);
+        text(128, 150, 200, true, CENTER, gc, gear(), true);
+        text(128, 336, 24, true, CENTER, AMBER, "NO LINK", !link);
+        box(256, 156, 2, 200, LINE, true);
         for (int t = 0; t < T_CH.length; t++)
-            tempCell(t, 284, 490, 140 + t * 48, 34, 34, rpm);
+            tempCell(t, 276, x1, 154 + t * 42, 30, 30, rpm);
+
+        // Boost: icon, strip from vacuum to boost with zero marked, value in bar.
+        int kpa = ok(CH_BOOST) ? r(val[CH_BOOST]) : 0;
+        boolean boosting = link && kpa > 0;
+        int zero = (0 - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN);
+        int pos = clamp((kpa - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN), 0, 100);
+        icon(x0, 386, 28, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
+        bar(x0 + 40, 392, 300, 18, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
+        text(x1 - 40, 384, 30, true, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
+        text(x1, 396, 13, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
     }
 
     /** One temperature: icon at x0, value right-aligned at x1, coloured by level. */
