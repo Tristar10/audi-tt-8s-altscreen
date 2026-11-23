@@ -468,7 +468,7 @@ autozoom)
     esac
     ;;
 tele)
-    # OpenHaldex autocross view (tt-zoom tele1, wiki Telemetry.md): our own full-screen picture over
+    # OpenHaldex autocross view (tt-zoom tele2, wiki Telemetry.md): our own full-screen picture over
     # the map tab (Classic) or the small view's map area (Sport). RAM switches, read within 1 s;
     # "boot" writes the one flash default.
     case "${2:-}" in
@@ -480,14 +480,14 @@ tele)
                *) say 'Usage: sh tt.sh tele demo on | off'; exit 2;; esac;;
         rot) case "${3:-}" in
                deg|-deg|rad|-rad|off) echo "$3" > /tmp/tt-tele-rot; say "Tilted text and icons: $3";;
-               *) say 'Usage: sh tt.sh tele rot deg | -deg | rad | -rad | off   (try until the corner text follows the slopes)'
+               *) say 'Usage: sh tt.sh tele rot deg | -deg | rad | -rad | off   (default -deg, right on the car)'
                   exit 2;; esac;;
         boot) case "${3:-}" in
                on) rw; touch $K/tele-on; ro; say 'Autocross view on at every MMI start.';;
                off) rw; rm -f $K/tele-on; ro; say 'Autocross view no longer on at start.';;
                *) say 'Usage: sh tt.sh tele boot on | off'; exit 2;; esac;;
         *) say 'Usage: sh tt.sh tele on | off | demo on|off | rot deg|-deg|rad|-rad|off | boot on|off'
-           say "   now: $(test -e /tmp/tt-tele-on && echo on || (test -e $K/tele-on && ! test -e /tmp/tt-tele-off && echo on || echo off)), demo $(test -e /tmp/tt-tele-demo && echo on || echo off), tilt $(cat /tmp/tt-tele-rot 2>/dev/null || echo deg)"
+           say "   now: $(test -e /tmp/tt-tele-on && echo on || (test -e $K/tele-on && ! test -e /tmp/tt-tele-off && echo on || echo off)), demo $(test -e /tmp/tt-tele-demo && echo on || echo off), tilt $(cat /tmp/tt-tele-rot 2>/dev/null || echo -deg)"
            exit 2;;
     esac
     ;;

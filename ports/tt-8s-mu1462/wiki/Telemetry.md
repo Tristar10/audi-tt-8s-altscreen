@@ -164,7 +164,21 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele1)
+## Autocross view on the head unit (tt-zoom tele2)
+
+First car run (tele1, 2026-11-23, parked, demo values): the whole layout draws and moves. Found:
+- tele1 was built on the v63 *prototype* (90300bc), not on the v63 the car runs (4e07548): the
+  prototype's screen-factory hook for the "About Apple CarPlay" page came back, and a wired
+  iPhone's CarPlay did not start (the wireless dongle did). tele2 merges 4e07548; apart from the 7
+  Tele classes and the hooks in RgdBus, RgiPlayer and TtPanel, every class is byte-identical to
+  v63 (e434810).
+- EAL blends pictures as premultiplied alpha: the 10-30 % glows came out as solid red. tele2
+  premultiplies every picture.
+- setRotationZ turns the other way: the corner text tilted against the slopes. tele2 defaults to
+  `-deg`.
+- The refresh looked slow; tele2 logs `tele stats` every 10 s (frames per second, job time,
+  changed slots).
+- The gear (font size 154) looks soft, probably scaled up from a smaller font size.
 
 Built from the `telemetry` branch: v63's code (nothing on `main` is missing) plus:
 

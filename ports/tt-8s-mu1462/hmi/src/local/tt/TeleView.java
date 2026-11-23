@@ -33,7 +33,7 @@ import de.esolutions.hmi.widgets.audi.base.eal.TextureDescription;
  *   /tmp/tt-tele-off     view off even when the flash default is on
  *   /mnt/app/root/tt/tele-on   flash: on at every start
  *   /tmp/tt-tele-demo    sweeping fake values, no OpenHaldex needed (the UDP port stays closed)
- *   /tmp/tt-tele-rot     tilted text and icons: deg (default), -deg, rad, -rad, or off (level)
+ *   /tmp/tt-tele-rot     tilted text and icons: -deg (default, right on the car), deg, rad, -rad, off
  * Shows only while the map tab or the small view's map area is up. Playback "tele ..." lines:
  * apply N | info.
  *
@@ -64,6 +64,11 @@ public final class TeleView implements Runnable {
     private static long lastPress;
     private static long jobs;
     private static long jobMsMax;
+    private static long statJobs;
+    private static long statMs;
+    private static long statMax;
+    private static long statAt;
+    private static long statSlots;
     private static int artKey = -1;
 
     // HMI thread only
@@ -165,13 +170,35 @@ public final class TeleView implements Runnable {
     }
 
     static void jobDone(long ms) {
+        String line = null;
         synchronized (ART) {
             jobs++;
             if (ms > jobMsMax) {
                 jobMsMax = ms;
             }
+            statJobs++;
+            statMs += ms;
+            if (ms > statMax) {
+                statMax = ms;
+            }
+            long now = System.currentTimeMillis();
+            if (statAt == 0) {
+                statAt = now;
+            } else if (now - statAt >= 10000L) {
+                line = new StringBuffer("tele stats: ").append(statJobs * 1000L / (now - statAt)).append(" frames/s, job avg ")
+                    .append(statMs / Math.max(1L, statJobs)).append(" ms max ").append(statMax).append(" ms, changed slots avg ")
+                    .append(statSlots / Math.max(1L, statJobs)).append(", art ").append(ART.size()).toString();
+                statJobs = 0;
+                statMs = 0;
+                statMax = 0;
+                statSlots = 0;
+                statAt = now;
+            }
         }
         pending = false;
+        if (line != null) {
+            RgdBus.note(line);
+        }
     }
 
     /** Off the HMI thread: draws every picture this frame shows that is not cached yet. */
@@ -219,13 +246,21 @@ public final class TeleView implements Runnable {
         return f.w[i] * f.h[i] > 40000 ? 2 : 1;
     }
 
+    /**
+     * EAL blends pictures as premultiplied alpha (tele1 on the car: a 10 % red glow came out as a
+     * bright red block), so every picture's colour is multiplied by its alpha here.
+     */
+    private static void put(byte[] b, int j, int rgb, int a) {
+        b[j] = (byte) (((rgb >> 16) & 0xFF) * a / 255);
+        b[j + 1] = (byte) (((rgb >> 8) & 0xFF) * a / 255);
+        b[j + 2] = (byte) ((rgb & 0xFF) * a / 255);
+        b[j + 3] = (byte) a;
+    }
+
     private static byte[] solid(int rgba) {
         byte[] b = new byte[SOLID * SOLID * 4];
         for (int j = 0; j < b.length; j += 4) {
-            b[j] = (byte) (rgba >>> 24);
-            b[j + 1] = (byte) (rgba >>> 16);
-            b[j + 2] = (byte) (rgba >>> 8);
-            b[j + 3] = (byte) rgba;
+            put(b, j, rgba >>> 8, rgba & 0xFF);
         }
         return b;
     }
@@ -234,10 +269,7 @@ public final class TeleView implements Runnable {
         byte[] b = new byte[px.length * 4];
         for (int i = 0, j = 0; i < px.length; i++, j += 4) {
             int c = px[i];
-            b[j] = (byte) (c >> 16);
-            b[j + 1] = (byte) (c >> 8);
-            b[j + 2] = (byte) c;
-            b[j + 3] = (byte) (((c >>> 24) * alpha) / 255);
+            put(b, j, c, ((c >>> 24) * alpha) / 255);
         }
         return b;
     }
@@ -265,11 +297,7 @@ public final class TeleView implements Runnable {
                         }
                     }
                 }
-                int j = (py * tw + px) * 4;
-                b[j] = (byte) (c >>> 24);
-                b[j + 1] = (byte) (c >>> 16);
-                b[j + 2] = (byte) (c >>> 8);
-                b[j + 3] = (byte) (a * hits / 16);
+                put(b, (py * tw + px) * 4, c >>> 8, a * hits / 16);
             }
         }
         return b;
@@ -320,6 +348,7 @@ public final class TeleView implements Runnable {
             note = new StringBuffer(note == null ? "" : note).append(" built ").append(f.count).append(" slots")
                 .toString();
         }
+        int changed = 0;
         for (int i = 0; i < f.count; i++) {
             TeleSlot s = slots[i];
             if (s.group == null) {
@@ -333,11 +362,20 @@ public final class TeleView implements Runnable {
             if (!vis) {
                 continue;
             }
+            int c0 = s.shownColour;
+            int x0 = s.sx;
+            String t0 = s.shownText;
             if (f.kind[i] == TeleLayout.TEXT) {
                 text(m, s, f, i);
             } else {
                 image(m, s, f, i);
             }
+            if (c0 != s.shownColour || x0 != s.sx || t0 != s.shownText) {
+                changed++;
+            }
+        }
+        synchronized (ART) {
+            statSlots += changed;
         }
         root.setVisible(true);
         vp.setForceInvisible(false);
@@ -531,11 +569,13 @@ public final class TeleView implements Runnable {
     private static void readSwitches() {
         on = ON_FILE.exists() || (DEFAULT_ON.exists() && !OFF_FILE.exists());
         demo = DEMO_FILE.exists();
+        // Default -deg: on the car (tele1) +deg tilted the corner text against the slopes.
         String r = readLine(ROT_FILE);
         float scale = 1f;
-        float sign = 1f;
+        float sign = -1f;
         boolean off = false;
         if (r != null) {
+            sign = 1f;
             if (r.startsWith("-")) {
                 sign = -1f;
                 r = r.substring(1);
