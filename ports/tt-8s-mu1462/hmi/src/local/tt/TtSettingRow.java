@@ -14,6 +14,8 @@ import de.esolutions.hmi.widgets.audi.evo.widgets.menu.MenuItemController;
 public class TtSettingRow extends MenuItemController {
     /** Our ChoiceModel (set by TtSettingsPage). */
     public Object ttModel;
+    /** Where the row was added (for the log). */
+    public String where = "";
 
     public TtSettingRow() {
         super();
@@ -22,7 +24,7 @@ public class TtSettingRow extends MenuItemController {
     protected void afterConnected() {
         super.afterConnected();
         try {
-            StringBuffer b = new StringBuffer("settings page: row connected, model ")
+            StringBuffer b = new StringBuffer("settings page: row connected in ").append(where).append(", model ")
                 .append(getModel() == ttModel ? "ours" : String.valueOf(getModel())).append(", children");
             List kids = getChildren();
             for (int i = 0; kids != null && i < kids.size(); i++) {

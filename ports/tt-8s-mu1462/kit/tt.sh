@@ -62,8 +62,8 @@ V60=ad9981b5e02acf0cdd2d4198974956e71614ac1f8a0b4d4e7c081bb2a44e4b1d
 V61=bd4cb99d71019f3503d853f389572a44ed319844ee10d5a38987f3647b9bd6f7
 # v62: v61 + banner distances in the phone's own words ("0.1 mi", not "550 ft")
 V62=4e1446f14ba9a2fe751d76f07ebb1bf92806d12ba3510f9b6616de43623397e2
-# v63: v62 + settings page prototype (About Apple CarPlay -> iPhone turn card drop-down)
-V63=d331464f02c3bd1aee005089b23a6f5c8d58a191c6cb23adbf07479763c7487f
+# v63: v62 + settings prototype: "iPhone turn card" drop-down in map options and MENU > Settings > MMI settings
+V63=e43481032f9ef653c8e9236f8dbd1cca2a5d42e6efb19a42ac0961039676ad2b
 SUP=/mnt/app/root/mu1438-cluster/cluster_supervisor.sh
 SUP_V2=9175a6deaff6acf2c4f35b61b245476ba8827e7f4b74977b48cdafc2c7c6f57c
 SUP_V3=4c37a375954a387e4938fbabcad868bb2fcc4207a97bcbe599421974e75f06bd
@@ -897,10 +897,10 @@ tostock)
     exit 0
     ;;
 settings)
-    # v63: our page in place of Options -> About Apple CarPlay. off = stock page again (RAM, until restart)
+    # v63: our rows in map options and MMI settings. off = stock menus again (RAM, until restart; reopen the menu)
     case "${2:-}" in
-        off) touch /tmp/tt-settings-off; say "Settings page off: About Apple CarPlay shows the stock text (next time it opens).";;
-        on) rm -f /tmp/tt-settings-off; say "Settings page on (next time About Apple CarPlay opens).";;
+        off) touch /tmp/tt-settings-off; say "Our setting rows off (stock menus from the next MMI restart for map options, next opening for MMI settings).";;
+        on) rm -f /tmp/tt-settings-off; say "Our setting rows on (next MMI restart for map options, next opening for MMI settings).";;
         *) grep -e "settings page" -e "card: setting" /tmp/tt-rgd.log | tail -20; say "Usage: sh tt.sh settings on|off   (no argument: the page log)";;
     esac
     ;;
