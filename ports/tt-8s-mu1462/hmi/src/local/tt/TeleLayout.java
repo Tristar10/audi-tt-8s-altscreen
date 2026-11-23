@@ -333,11 +333,19 @@ public final class TeleLayout {
         int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
         double ba = r0 + 90;
         double bb = len - 10;
-        double bf = ba + (bb - ba) * act / 100;
-        double bt = ba + (bb - ba) * tgt / 100;
-        bandOff(ba, bb, half(ba) + 34, half(ba) + 44, half(bb) + 34, half(bb) + 44, TRACK, true);
-        bandOff(ba, bf, half(ba) + 34, half(ba) + 44, half(bf) + 34, half(bf) + 44, link ? HALDEX : GREY, act > 0);
-        bandOff(bt - 2, bt + 2, half(bt) + 30, half(bt) + 48, half(bt) + 30, half(bt) + 48, WHITE, ok(CH_HX_TARGET));
+        // Fixed pieces (no shape changes per frame on the car): each piece is lit or not, and the
+        // target tick is a white mark over the piece holding the target.
+        int hs = 25;
+        int ti = Math.min(hs - 1, tgt * hs / 100);
+        for (int j = 0; j < hs; j++) {
+            double a = ba + (bb - ba) * j / hs;
+            double b = ba + (bb - ba) * (j + 1) / hs - 1.2;
+            boolean on = link && act > 0 && j * 100 / hs < act;
+            bandOff(a, b, half(a) + 34, half(a) + 44, half(b) + 34, half(b) + 44, on ? HALDEX : TRACK, true);
+            double m = (a + b) / 2;
+            bandOff(m - 2, m + 2, half(m) + 30, half(m) + 48, half(m) + 30, half(m) + 48, WHITE,
+                ok(CH_HX_TARGET) && j == ti);
+        }
         slopeIcon(ba + 4, half(ba) + 56, 32, TeleIcons.AWD, ICONC, true);
         slopeText(ba + 50, half(ba + 50) + 54 + 0.82 * 42, 42, true, LEFT, vc,
             ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
@@ -380,8 +388,12 @@ public final class TeleLayout {
         }
         double az = 180 - 180.0 * (0 - BOOST_MIN) / (BOOST_MAX - BOOST_MIN);
         arcSeg(acx, acy, 78, 118, az + 0.8, az - 0.8, WHITE, true);
-        double ap = 180 - 180.0 * (clamp(peakKpa, BOOST_MIN, BOOST_MAX) - BOOST_MIN) / (BOOST_MAX - BOOST_MIN);
-        arcSeg(acx, acy, 108, 124, ap + 1.2, ap - 1.2, WHITE, link && peakKpa > 0);
+        // Peak marker: one fixed mark per segment, the one holding the peak shows.
+        int pi = Math.min(segs - 1, (clamp(peakKpa, BOOST_MIN, BOOST_MAX) - BOOST_MIN) * segs / (BOOST_MAX - BOOST_MIN));
+        for (int i = 0; i < segs; i++) {
+            double am = 180 - 180.0 * (i + 0.5) / segs;
+            arcSeg(acx, acy, 108, 124, am + 1.2, am - 1.2, WHITE, link && peakKpa > 0 && i == pi);
+        }
         text(acx, 250, 50, true, CENTER, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
         icon(acx - 42, 302, 22, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
         text(acx - 14, 304, 16, true, LEFT, GREY, boostPsi ? "PSI" : "BAR", true);

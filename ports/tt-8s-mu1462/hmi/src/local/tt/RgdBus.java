@@ -122,6 +122,7 @@ public final class RgdBus implements Runnable {
             k.start();
             RgiPlayer.start();
             RouteRec.start();
+            TeleView.start();
         } catch (Throwable t) {
             log(new StringBuffer("start failed ").append(String.valueOf(t)).toString());
         }

@@ -113,6 +113,8 @@ public final class RgiPlayer implements Runnable {
                 RgdBus.note(new StringBuffer("play: say ").append(arg).toString());
             } else if (cmd.equals("panel")) {
                 RgdBus.note(TtPanel.cmd(arg));
+            } else if (cmd.equals("tele")) {
+                RgdBus.note(TeleView.cmd(arg));
             } else if (cmd.equals("rgd")) {
                 // v58: a recorded iPhone update through the live path (silent; RgdBus logs its own)
                 RgdBus.replay(arg);

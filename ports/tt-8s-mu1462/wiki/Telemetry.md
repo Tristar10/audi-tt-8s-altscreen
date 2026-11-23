@@ -25,7 +25,7 @@ the cockpit map area, like a second AltScreen page.
 | Presets from the MMI | Works on the Mac bench (apply preset 2: ok, channel 22 follows). `ttlink -a` tested on the PC against `gauge-send.py --presets`; not yet against the real board |
 | MMI hotspot gateway | Without a mobile data connection the hotspot hands out no gateway (below). OpenHaldex v1.1.16 falls back to (own address & netmask) \| 1 = `10.173.189.1` and accepts replies only from there. Builds and runs; the no-gateway path is first exercised in the car |
 | Link test in the car | Not done |
-| Cockpit text page, wheel double-press | Not started. The dial sketch in `gauges/hmi` is on hold and kept only for its drawing and threading code |
+| Autocross view on the cockpit | Built into tt-zoom `tele1` (v63 + the view, 2026-11-23); compiles against the stock HMI, library check clean. Receiver tested on the PC against `gauge-send.py --presets`: 20 Hz, 0 lost, catalog parsed, apply preset ok. Not run in the car yet. Wheel double press not traced; on/off by switch file for now |
 
 ## Where the data comes from
 
@@ -163,6 +163,48 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 ```bash
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
+
+## Autocross view on the head unit (tt-zoom tele1)
+
+Built from the `telemetry` branch: v63's code (nothing on `main` is missing) plus:
+
+| File | What |
+|---|---|
+| `hmi/src/local/tt/TeleLayout.java`, `TeleIcons.java` | The layout and icons (the same code the PC preview draws) |
+| `hmi/src/local/tt/TeleLink.java` | Receiver: UDP 49160, open only while the view is on (so `ttlink` still works when it is off); acks every TTG1 with TTA1; reads the TTP1 catalog; merges channels from several senders; `apply` sends TTC1 to the catalog's sender |
+| `hmi/src/local/tt/TeleView.java`, `TeleFrame`, `TeleSlot`, `TeleJob` | Drawing. Tick thread at 20 Hz builds the layout and draws every new picture off the HMI thread (quads with 4x4 soft edges, big glows at half size, icons, solid blocks); posts one job when the picture changed. The HMI thread only creates nodes, uploads those pictures and switches visibility, text, colour (one node per colour a slot uses), position and scale. Own viewport at index 228, above the turn panel (225), opaque, so the map and the panel are hidden while it shows |
+| `RgdBus.start` | starts it; `RgiPlayer` playback line `tele apply N` / `tele info`; `TtPanel.ealManager()` |
+
+It shows only while the map tab (Classic) or the small view's map area (Sport) is up. Switches,
+RAM unless noted, read within 1 s, through the kit:
+
+```
+sh tt.sh tele on | off          # view on/off (until the double press is traced)
+sh tt.sh tele demo on | off     # sweeping fake values, no OpenHaldex needed
+sh tt.sh tele rot deg | -deg | rad | -rad | off   # how the tilted corner text turns
+sh tt.sh tele boot on | off     # flash: on at every MMI start
+```
+
+Messages go to `/tmp/tt-rgd.log` (`tele rx listening`, `tele catalog`, `tele job N ms` when a job
+takes over 30 ms or reports something).
+
+Not known until the car:
+- Tilted text and icons use `setRotationZ` on a group node, never used on the car before: degrees
+  or radians, and which way. `tele rot` switches it live; `off` makes them level.
+- Positions come from photos; the cluster's own parts are drawn above our layer.
+- How long the first build takes (about 300 nodes) and the per-frame jobs.
+- The fonts are the HMI's, so text widths differ a little from the preview.
+
+### Parked test (tele1)
+
+| # | Do | Pass |
+|---|---|---|
+| T1 | Copy `hmi/out/tele1/tt-zoom.jar` (as `/tmp/tt-zoom-tele1.jar`) and the new `kit/tt.sh` to the car. `mount -uw /mnt/app; cp /tmp/tt-zoom-tele1.jar /mnt/app/eso/hmi/lsd/jars/tt-zoom.jar; cp /tmp/tt.sh /mnt/app/root/tt.sh; mount -ur /mnt/app`, restart the MMI | CarPlay, the map and the turn panel work as with v63 (the view is off by default). Back: `sh tt.sh use v63` |
+| T2 | Map tab, Classic view: `sh tt.sh tele demo on`, then `sh tt.sh tele on` | The autocross view replaces the map within a second and sweeps: shift lights, rev strip, gear, boost arc. Photo. `tele job` lines in the log |
+| T3 | `sh tt.sh tele rot -deg`, `rad`, `-rad` in turn if the corner text is not along the slopes | One of them follows the slopes; note which |
+| T4 | Switch to the Sport view, then the car tab, then back to the map | Sport layout in the map area; nothing on the car tab; back on the map tab the view returns |
+| T5 | `sh tt.sh tele off` | The map is back at once |
+| T6 | With OpenHaldex on the hotspot and `ttlink` not running: `sh tt.sh tele demo off; sh tt.sh tele on` | Live values; link "Hz" shown only when slow; `tele info` (playback) shows rx and rate |
 
 ## Car test plan (parked, one step per test)
 

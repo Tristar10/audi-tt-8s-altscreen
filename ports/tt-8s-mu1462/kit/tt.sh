@@ -467,6 +467,30 @@ autozoom)
            exit 2;;
     esac
     ;;
+tele)
+    # OpenHaldex autocross view (tt-zoom tele1, wiki Telemetry.md): our own full-screen picture over
+    # the map tab (Classic) or the small view's map area (Sport). RAM switches, read within 1 s;
+    # "boot" writes the one flash default.
+    case "${2:-}" in
+        on) rm -f /tmp/tt-tele-off; touch /tmp/tt-tele-on; say 'Autocross view on (shows on the map tab).';;
+        off) rm -f /tmp/tt-tele-on; touch /tmp/tt-tele-off; say 'Autocross view off.';;
+        demo) case "${3:-on}" in
+               on) touch /tmp/tt-tele-demo; say 'Demo values on: sweeping fake data, no OpenHaldex needed.';;
+               off) rm -f /tmp/tt-tele-demo; say 'Demo values off: live OpenHaldex data.';;
+               *) say 'Usage: sh tt.sh tele demo on | off'; exit 2;; esac;;
+        rot) case "${3:-}" in
+               deg|-deg|rad|-rad|off) echo "$3" > /tmp/tt-tele-rot; say "Tilted text and icons: $3";;
+               *) say 'Usage: sh tt.sh tele rot deg | -deg | rad | -rad | off   (try until the corner text follows the slopes)'
+                  exit 2;; esac;;
+        boot) case "${3:-}" in
+               on) rw; touch $K/tele-on; ro; say 'Autocross view on at every MMI start.';;
+               off) rw; rm -f $K/tele-on; ro; say 'Autocross view no longer on at start.';;
+               *) say 'Usage: sh tt.sh tele boot on | off'; exit 2;; esac;;
+        *) say 'Usage: sh tt.sh tele on | off | demo on|off | rot deg|-deg|rad|-rad|off | boot on|off'
+           say "   now: $(test -e /tmp/tt-tele-on && echo on || (test -e $K/tele-on && ! test -e /tmp/tt-tele-off && echo on || echo off)), demo $(test -e /tmp/tt-tele-demo && echo on || echo off), tilt $(cat /tmp/tt-tele-rot 2>/dev/null || echo deg)"
+           exit 2;;
+    esac
+    ;;
 banner)
     # Our turn banner on the CarPlay map (tt-zoom v45/v46). RAM only, applies within 2 s.
     #   always     (default) shown the whole route
@@ -945,6 +969,7 @@ save)
     say 'sh tt.sh hookfix [undo]      CarPlay hook TT build 2 (flash, then MMI restart)'
     say 'sh tt.sh autozoom on|off|steps N  zoom the map in near turns, out after'
     say 'sh tt.sh banner always|auto|alpha N  our banner always / only near turns, background opacity'
+    say 'sh tt.sh tele on|off|demo|rot|boot  OpenHaldex autocross view (demo: fake values, no board)'
     say 'sh tt.sh eta on|off             the phone app'"'"'s own ETA bar on the cockpit map'
     say 'sh tt.sh look 1|2|3|4|reset  how much road the cockpit map shows (next replug, RAM only)'
     say 'sh tt.sh sup [v6|v7|undo]    renderer supervisor: v6 (keeps the display switch), v7, or back to v2 (flash, then replug)'

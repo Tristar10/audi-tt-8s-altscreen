@@ -110,6 +110,11 @@ public final class TtPanel {
         }
     }
 
+    /** The cockpit's EALManager for other views (TeleView). */
+    static EALManager ealManager() {
+        return manager();
+    }
+
     private static EALManager manager() {
         synchronized (LOCK) {
             if (eal != null) {
