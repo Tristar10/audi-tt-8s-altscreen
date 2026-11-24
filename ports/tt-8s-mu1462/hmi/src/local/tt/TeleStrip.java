@@ -58,15 +58,19 @@ public final class TeleStrip {
             acc += sl[i];
         }
         double sRed = t.rpmToS(t.redlineRpm);
-        double sShift = t.rpmToS(t.shiftRpm);
+        double sShift = sRed; // the lit strip turns red at the red line (6800), where the red zone starts
         int kFrom = (t.barFromRpm + 999) / 1000;
         int kTo = t.barToRpm / 1000;
         double[] ticks = new double[Math.max(0, kTo - kFrom + 1)];
+        double[] tickX = new double[ticks.length];
+        double[] o = new double[4];
         int nt = 0;
         for (int k = Math.max(1, kFrom); k <= kTo; k++) {
             double s = t.rpmToS(k * 1000);
             // none on a corner (the round join would make it a wedge) or at the very end
             if (Math.abs(s - sl[0]) > 4 && Math.abs(s - sl[0] - sl[1]) > 4 && s < acc - 4) {
+                TeleLayout.tp(s, o);
+                tickX[nt] = o[0];
                 ticks[nt++] = s;
             }
         }
@@ -105,7 +109,7 @@ public final class TeleStrip {
                 double inside = hw - perp; // px in from the edge
                 double tick = 0;
                 for (int k = 0; k < nt; k++) {
-                    tick = Math.max(tick, clamp01(1.6 - Math.abs(bs - ticks[k])));
+                    tick = Math.max(tick, clamp01(1.6 - Math.abs(x - tickX[k]))); // vertical ticks
                 }
                 // Track: an outlined band (after Audi's RS performance layout): a near-black body and
                 // a 1.5 px hairline edge, red past the redline; faint ticks.
@@ -118,7 +122,7 @@ public final class TeleStrip {
                 // Lit: cool white, warming to amber over the last 1500 rpm before the shift point,
                 // red past it; a soft tube shading across, darker ticks.
                 int rpm = t.sToRpm(bs);
-                int warm = t.shiftRpm - 1500;
+                int warm = t.redlineRpm - 1500;
                 int lc = bs >= sShift ? TeleLayout.RED
                     : rpm <= warm ? TeleLayout.STRIP_LO
                     : TeleLayout.mix(TeleLayout.STRIP_LO, TeleLayout.AMBER, (rpm - warm) / 1500f);
