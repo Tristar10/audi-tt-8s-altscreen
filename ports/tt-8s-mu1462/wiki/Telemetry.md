@@ -165,7 +165,7 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele13, tele14)
+## Autocross view on the head unit (tt-zoom tele13 to tele15)
 
 Sport view (user 2026-11-24): the panel outline (TeleLayout SP_X/SP_Y) traces what the cluster lets
 through: the frame's diagonal, under the stock status line, around the big rev counter (8 px outside
@@ -175,7 +175,8 @@ temperatures 36 px on 50 px rows. From the shift point a warning flashes with th
 thick red frame with a glow along the outline, a red tint over the panel and a hazard band along its
 top (fixed shapes, only shown or hidden). tele14: the top band is a shift-light row instead of hazard
 stripes (ten glass segments lighting left to right over the last 1200 rpm, mint, cobalt, red, all
-flashing red from the shift point); the theme puts the white-haired chibi in the panel's top-right.
+flashing red from the shift point); the theme puts the white-haired chibi in the panel's top-right. tele15: Sport content 10-18 px lower (the top
+rows were against the frame's diagonal and top edge; the lower part had room).
 
 ### Earlier: tele12
 
