@@ -18,6 +18,9 @@ import java.net.InetAddress;
  *   TTG1 telemetry: "TTG1" key u32, seq u16, flags u8, count u8, count * (u16 id, s32 value*1000).
  *        Answered with TTA1: "TTA1" seq u16, 0 u16, rx u32, lost u32, uptime ms u32.
  *   TTP1 preset catalog: "TTP1" key u32, version u16, count u8, count * (id u8, mode u8, len u8, name).
+ *   TTC1 command: "TTC1" key u32, seq u16, cmd u8, arg u8, version u16. cmd 1 APPLY_PRESET (arg
+ *        preset id, version = catalog), 2 SET_MODE (arg 0..10, channel 12 numbering), 3 SET_LOCK
+ *        (arg 0..100 %, enters MANUAL = 11); board v1.1.21, OpenHaldex docs/PRESETS.md.
  *   TTR1 reply to a TTC1 command: "TTR1" key u32, seq u16, result u8, active u8, version u16.
  * Several senders may stream (a second CAN board later): channels are merged, newest wins. Preset
  * commands go only to the sender of the catalog (OpenHaldex).
@@ -51,6 +54,20 @@ final class TeleLink implements Runnable {
     private static int catN;
     private static int catVer = -1;
     private static InetAddress ohAddr;
+    /** Last TTG1 sender: commands can go there before a catalog arrived. */
+    private static InetAddress tgAddr;
+    private static int tgPort;
+    static final int CMD_APPLY = 1;
+    static final int CMD_MODE = 2;
+    static final int CMD_LOCK = 3;
+    /** Result of the last TTR1 and its seq, -1 none (TeleUi shows refusals). */
+    private static int lastResult = -1;
+    private static int lastResultSeq = -1;
+    /** Demo values (no OpenHaldex): what the control page last asked for, so the demo confirms it. */
+    static volatile boolean demoLink;
+    static volatile int demoPreset = 2;
+    static volatile int demoMode = 9;
+    static volatile int demoLock = 255;
     private static int ohPort;
     private static int cmdSeq;
     private static int rateHz = -1;
@@ -195,6 +212,8 @@ final class TeleLink implements Runnable {
                 acks++;
                 winAcks++;
                 lastFrom = from.getHostAddress();
+                tgAddr = from;
+                tgPort = port;
             }
         } else if (n >= 11 && magic(b, 'T', 'T', 'P', '1')) {
             if (rd32(b, 4) != key) {
@@ -248,6 +267,8 @@ final class TeleLink implements Runnable {
                 .append(b[10] & 0xFF).append(" active ").append(b[11] & 0xFF);
             synchronized (LOCK) {
                 lastReply = r.toString();
+                lastResult = b[10] & 0xFF;
+                lastResultSeq = rd16(b, 8);
             }
             RgdBus.note(new StringBuffer("tele ").append(lastReply).toString());
         } else {
@@ -273,19 +294,41 @@ final class TeleLink implements Runnable {
 
     /** Asks OpenHaldex to apply a preset (TTC1, sent once; channel 22 confirms). */
     static String apply(int presetId) {
+        return command(CMD_APPLY, presetId);
+    }
+
+    /**
+     * Sends one TTC1 (sent once; the stream confirms: channel 22 for a preset, 12 for a mode, 12 = 11
+     * and 23 for a lock). Returns a line for the log; the seq is in lastSeq().
+     */
+    static String command(int cmd, int arg) {
+        if (demoLink) {
+            if (cmd == CMD_APPLY) {
+                demoPreset = arg;
+            } else if (cmd == CMD_MODE) {
+                demoMode = arg;
+                demoLock = 255;
+                demoPreset = 255;
+            } else if (cmd == CMD_LOCK) {
+                demoMode = 11;
+                demoLock = arg;
+                demoPreset = 255;
+            }
+            return new StringBuffer("tele command (demo) ").append(cmd).append(' ').append(arg).toString();
+        }
         InetAddress to;
         int port;
         int ver;
         int seq;
         synchronized (LOCK) {
-            to = ohAddr;
-            port = ohPort;
-            ver = catVer;
+            to = ohAddr != null ? ohAddr : tgAddr;
+            port = ohAddr != null ? ohPort : tgPort;
+            ver = cmd == CMD_APPLY ? catVer : 0;
             seq = cmdSeq = (cmdSeq + 1) & 0xFFFF;
         }
         DatagramSocket s = sock;
-        if (to == null || ver < 0 || s == null) {
-            return "tele apply: no catalog from OpenHaldex yet";
+        if (to == null || s == null || (cmd == CMD_APPLY && ver < 0)) {
+            return "tele command: no link to OpenHaldex yet";
         }
         byte[] c = new byte[14];
         c[0] = 'T';
@@ -294,15 +337,28 @@ final class TeleLink implements Runnable {
         c[3] = '1';
         wr32(c, 4, key);
         wr16(c, 8, seq);
-        c[10] = 1;
-        c[11] = (byte) presetId;
+        c[10] = (byte) cmd;
+        c[11] = (byte) arg;
         wr16(c, 12, ver);
         try {
             s.send(new DatagramPacket(c, c.length, to, port));
         } catch (Throwable t) {
             return new StringBuffer("tele apply failed ").append(String.valueOf(t)).toString();
         }
-        return new StringBuffer("tele apply preset ").append(presetId).append(" cmd ").append(seq).toString();
+        return new StringBuffer("tele command ").append(cmd).append(' ').append(arg).append(" seq ").append(seq).toString();
+    }
+
+    static int lastSeq() {
+        synchronized (LOCK) {
+            return cmdSeq;
+        }
+    }
+
+    /** The TTR1 result for seq, or -1 when none came (yet). */
+    static int resultFor(int seq) {
+        synchronized (LOCK) {
+            return lastResultSeq == seq ? lastResult : -1;
+        }
     }
 
     /** Copies the latest state into the layout's inputs. */
@@ -341,7 +397,9 @@ final class TeleLink implements Runnable {
         put(t, TeleLayout.CH_IAT, 38);
         put(t, TeleLayout.CH_DSG, 80);
         put(t, TeleLayout.CH_CLUTCH, 45 + 50 * f);
-        put(t, TeleLayout.CH_PRESET, 2);
+        put(t, TeleLayout.CH_PRESET, demoPreset);
+        put(t, TeleLayout.CH_MODE, demoMode);
+        put(t, TeleLayout.CH_LOCK_SET, demoLock);
         String[] names = {"Street", "Autocross", "Launch", "Wet", "FWD"};
         int[] modes = {0, 9, 2, 9, 1};
         t.catN = names.length;

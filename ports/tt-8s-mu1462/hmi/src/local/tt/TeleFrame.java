@@ -24,6 +24,8 @@ final class TeleFrame {
     int[] qy;
     /** tele8 probe: the painted strip with its lit picture cut at pCut (wiki Telemetry.md). */
     boolean probe;
+    /** tele17: theme picture for slot 0 (TeleLayout.VIEW_*), -1 none. */
+    int theme = -1;
     int pMode;
     int pRpm;
     int pCut;
@@ -76,7 +78,7 @@ final class TeleFrame {
 
     /** Same picture as another frame (so nothing needs to be sent to the HMI thread). */
     boolean sameAs(TeleFrame o) {
-        if (o == null || o.show != show || o.key != key || o.count != count || o.probe != probe) {
+        if (o == null || o.show != show || o.key != key || o.count != count || o.probe != probe || o.theme != theme) {
             return false;
         }
         if (probe) {

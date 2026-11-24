@@ -165,7 +165,37 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele13 to tele16)
+## Autocross view on the head unit (tt-zoom tele17)
+
+**Haldex control page** (user 2026-11-24: presets, modes and a lock slider from the cockpit).
+TeleUi: one cursor over the presets, then MODE, then LOCK; press on a preset applies it, on MODE
+or LOCK it starts editing (roll changes, press sends, back cancels); closes after 20 s idle. Every
+command is sent once and confirmed by the stream (channel 22 preset, 12 mode, 12 = 11 and 23 for
+the lock); TTR1 refusals are shown in words, "NO ANSWER" after 3 s. Classic: presets left of the gear,
+mode and slider right of it, status in the temperature row. Sport: in the temperature column.
+Board contract (OpenHaldex v1.1.21, docs/PRESETS.md): TTC1 cmd 2 SET_MODE (mode 0..10, channel 12
+numbering), cmd 3 SET_LOCK (0..100 %, enters MANUAL = 11, gated like the fixed lock modes, RAM
+only: a reboot restores MAP), channel 23 = MANUAL setpoint (255 otherwise). Lock % is the lock
+target: 100 = fully locked (like 50:50), 40 = 60:40.
+- `sh tt.sh tele ui open|up|down|press|back|close` drives it from SSH.
+- Steering wheel: `sh tt.sh tele ui map "CODE EVENT ACTION" ...` (EVENT pressed|turned|long; ACTION
+  open|up|down|press|back), codes from the key trace; `tele ui savemap` keeps it on flash.
+
+**Theme on the car**: the simulator exports the backgrounds (`java -cp out local.tt.Theme --export
+DIR colour` -> theme-classic.rgba, theme-sport.rgba, 1440 x 540 RGBA, 3.1 MB each). Copy them to
+the car's /tmp, `sh tt.sh tele theme install`, `sh tt.sh tele theme on` (or `boot`). TeleView reads
+a view's file once and uploads it as slot 0's picture; the gear notch turns see-through. The log
+shows the Java heap after loading (`grep "tele theme" /tmp/tt-rgd.log`).
+
+**Glide** (TeleGlide, shared with the simulator): `sh tt.sh tele glide on|off|boot`; the moving
+channels go along the line between the last two samples, one sample (about 50 ms) late.
+
+**Selftest**: `sh tt.sh tele selftest` walks through the parked test (view and build time,
+switching, redline flash, sound list and tones, key trace, strip probe, shift tone), waits for
+Enter between steps and writes everything to /tmp/tt-selftest-HHMMSS.txt.
+
+### Earlier: tele13 to tele16
+
 
 Sport view (user 2026-11-24): the panel outline (TeleLayout SP_X/SP_Y) traces what the cluster lets
 through: the frame's diagonal, under the stock status line, around the big rev counter (8 px outside

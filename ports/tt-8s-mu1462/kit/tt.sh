@@ -475,7 +475,7 @@ tele)
             slay -f ttlink 2>/dev/null; say 'Stopped ttlink (it held UDP 49160, which the view needs).'
         fi
     }
-    # OpenHaldex autocross view (tt-zoom tele16, wiki Telemetry.md): our own full-screen picture over
+    # OpenHaldex autocross view (tt-zoom tele17, wiki Telemetry.md): our own full-screen picture over
     # the map tab (Classic) or the small view's map area (Sport). RAM switches, read within 1 s;
     # "boot" writes the one flash default.
     case "${2:-}" in
@@ -500,6 +500,70 @@ tele)
         sounds) say 'Sound files on the head unit (also saved to /tmp/tt-sounds.txt):'
                 find /mnt /eso /fs -type f \( -name '*.wav' -o -name '*.WAV' -o -name '*.pcm' -o -name '*.mp3' -o -name '*.ogg' \) > /tmp/tt-sounds.txt 2>/dev/null
                 cat /tmp/tt-sounds.txt | head -60; say "$(wc -l < /tmp/tt-sounds.txt) files";;
+        ui) case "${3:-}" in
+               open|up|down|press|back|close) echo "$3" > /tmp/tt-tele-ui; say "Control page: $3";;
+               map) case "${4:-}" in
+                      "") say 'Usage: sh tt.sh tele ui map "CODE EVENT ACTION" ...   (EVENT pressed|turned|long; ACTION open|up|down|press|back)'; exit 2;;
+                      *) shift 3; : > /tmp/tt-tele-keymap; for l in "$@"; do echo "$l" >> /tmp/tt-tele-keymap; done; say "Key map (RAM):"; cat /tmp/tt-tele-keymap;; esac;;
+               savemap) if test -f /tmp/tt-tele-keymap; then rw; cp /tmp/tt-tele-keymap $K/tele-keymap; ro; say 'Key map saved to flash.'; else say 'No key map in RAM: sh tt.sh tele ui map ... first.'; exit 1; fi;;
+               *) say 'Usage: sh tt.sh tele ui open | up | down | press | back | close | map "CODE EVENT ACTION"... | savemap'; exit 2;; esac;;
+        glide) case "${3:-}" in
+               on) touch /tmp/tt-tele-glide; say 'Glide on: gauges move smoothly between data updates (about 50 ms behind).';;
+               off) rm -f /tmp/tt-tele-glide; if test -f $K/tele-glide; then rw; rm -f $K/tele-glide; ro; fi; say 'Glide off.';;
+               boot) rw; touch $K/tele-glide; ro; say 'Glide on at every start.';;
+               *) say 'Usage: sh tt.sh tele glide on | off | boot'; exit 2;; esac;;
+        theme) case "${3:-}" in
+               on) if test -f $K/theme-classic.rgba -o -f $K/theme-sport.rgba; then touch /tmp/tt-tele-theme; say 'Theme on (within 1 s).'
+                   else say "No theme pictures in $K: copy theme-classic.rgba and theme-sport.rgba there first."; exit 1; fi;;
+               off) rm -f /tmp/tt-tele-theme; if test -f $K/tele-theme; then rw; rm -f $K/tele-theme; ro; fi; say 'Theme off.';;
+               boot) rw; touch $K/tele-theme; ro; say 'Theme on at every start.';;
+               install) for v in classic sport; do
+                          if test -f /tmp/theme-$v.rgba; then rw; cp /tmp/theme-$v.rgba $K/theme-$v.rgba; ro; say "Installed theme-$v.rgba."; fi
+                        done;;
+               *) say 'Usage: sh tt.sh tele theme on | off | boot | install   (install copies /tmp/theme-*.rgba to the flash)'; exit 2;; esac;;
+        selftest)
+            # One parked test of everything in the autocross view (wiki Telemetry.md "Selftest").
+            # Each step says what to watch; Enter moves on. Everything lands in one file to send back.
+            OUT=/tmp/tt-selftest-$(date +%H%M%S 2>/dev/null || echo run).txt
+            st_log(){ echo "== $*" >> $OUT; }
+            st_grab(){ grep "$1" /tmp/tt-rgd.log 2>/dev/null | tail -${2:-40} >> $OUT; }
+            st_wait(){ say "$*"; say '   ... press Enter when done'; read _x; }
+            : > $OUT
+            st_log "selftest $(date 2>/dev/null)"
+            st_log jar; $T /mnt/app/eso/hmi/lsd/jars/tt-zoom.jar >> $OUT 2>&1
+            say 'Selftest: park, engine running or ignition on, cockpit on the MAP tab.'
+            rm -f /tmp/tt-tele-off /tmp/tt-tele-probe /tmp/tt-tele-shiftbeep; touch /tmp/tt-tele-on /tmp/tt-tele-demo; tele_free
+            st_wait '1/7 View on with demo values. Note how long until it draws (Classic).'
+            st_log 'step 1 start and build'; st_grab 'tele' 40
+            st_wait '2/7 Switch Sport -> Classic -> Sport -> Classic with the View button, 3 times. Note if Classic still lags.'
+            st_log 'step 2 switching'; st_grab 'built\|tele job\|tele stats' 40
+            st_wait '3/7 Watch the demo sweep pass 6500 a few times: strip, shift lights (and Sport frame) flash together? Any freeze?'
+            st_log 'step 3 redline'; st_grab 'tele stats\|lost' 20
+            say '4/7 Sound files on the head unit:'
+            find /mnt /eso /fs -type f \( -name '*.wav' -o -name '*.WAV' -o -name '*.pcm' -o -name '*.mp3' -o -name '*.ogg' \) 2>/dev/null > /tmp/tt-sounds.txt
+            st_log 'step 4 sounds'; cat /tmp/tt-sounds.txt >> $OUT; say "   $(wc -l < /tmp/tt-sounds.txt) files listed"
+            for n in 1 2 3 4 5 6 7 8; do
+                echo "$n system" > /tmp/tt-tele-beep; say "   tone $n (system)"; sleep 3
+            done
+            echo "default system" > /tmp/tt-tele-beep; say '   default tone (system)'; sleep 3
+            echo "1 ring" > /tmp/tt-tele-beep; say '   tone 1 (ring player)'; sleep 4
+            st_wait '   Which tone numbers did you hear? (write them down)'
+            st_log 'step 4 beeps'; st_grab 'beep' 60
+            touch /tmp/tt-tele-keys
+            st_wait '5/7 Key trace on: press each steering-wheel button (scroll wheel press, roll up/down, view, menu), slowly, one by one.'
+            rm -f /tmp/tt-tele-keys; st_log 'step 5 keys'; st_grab 'tele key' 80
+            echo grp > /tmp/tt-tele-probe
+            st_wait '6/7 Strip probe: does the lit strip end at the white marks while the demo sweeps? Photo of the text line please.'
+            echo img > /tmp/tt-tele-probe
+            st_wait '   Same with the clip on the picture (img mode): better, worse, same?'
+            rm -f /tmp/tt-tele-probe; st_log 'step 6 probe'; st_grab 'probe' 30
+            echo "1 system" > /tmp/tt-tele-shiftbeep
+            st_wait '7/7 Shift tone on tone 1: does it sound each time the sweep passes 6500? Late or on time?'
+            rm -f /tmp/tt-tele-shiftbeep; st_log 'step 7 shift tone'; st_grab 'shift tone\|beep' 30
+            rm -f /tmp/tt-tele-demo
+            st_log 'tail'; tail -80 /tmp/tt-rgd.log >> $OUT 2>/dev/null
+            say "Done. Send me $OUT (scp it like the jar, the other way) and your notes."
+            ;;
         keys) case "${3:-}" in
                trace) touch /tmp/tt-tele-keys; say 'Key trace on: press the wheel buttons, then: grep "tele key" /tmp/tt-rgd.log | tail -30';;
                notrace) rm -f /tmp/tt-tele-keys; say 'Key trace off.';;
@@ -520,7 +584,7 @@ tele)
                on) rw; touch $K/tele-on; ro; say 'Autocross view on at every MMI start.';;
                off) rw; rm -f $K/tele-on; ro; say 'Autocross view no longer on at start.';;
                *) say 'Usage: sh tt.sh tele boot on | off'; exit 2;; esac;;
-        *) say 'Usage: sh tt.sh tele on | off | demo on|off | keys trace|toggle N|save N | beep N | shiftbeep N|off | sounds | probe on|img|off | rot deg|-deg|rad|-rad|off | boot on|off'
+        *) say 'Usage: sh tt.sh tele on | off | demo on|off | ui open|up|down|press|back | glide on|off|boot | theme on|off|boot|install | selftest | keys trace|toggle N|save N | beep N | shiftbeep N|off | sounds | probe on|img|off | rot deg|-deg|rad|-rad|off | boot on|off'
            say "   now: $(test -e /tmp/tt-tele-on && echo on || (test -e $K/tele-on && ! test -e /tmp/tt-tele-off && echo on || echo off)), demo $(test -e /tmp/tt-tele-demo && echo on || echo off), probe $(cat /tmp/tt-tele-probe 2>/dev/null || echo off), tilt $(cat /tmp/tt-tele-rot 2>/dev/null || echo -deg)"
            exit 2;;
     esac

@@ -70,6 +70,10 @@ public final class TeleLayout {
     public static final int CH_DSG = 16;
     public static final int CH_CLUTCH = 19;
     public static final int CH_PRESET = 22;
+    /** OpenHaldex effective mode (MODES index; 11 = MANUAL), board v1.1.21. */
+    public static final int CH_MODE = 12;
+    /** Manual lock setpoint %, 255 when not in MANUAL (board v1.1.21). */
+    public static final int CH_LOCK_SET = 23;
 
     public static final int BG = 0x000000FF;
     public static final int PANEL = 0x0B0F14FF;
@@ -114,7 +118,7 @@ public final class TeleLayout {
     public static final int ACTIVE = 0x34C759FF;
 
     private static final String[] MODES = {"STOCK", "FWD", "50:50", "60:40", "70:30", "80:20", "90:10",
-        "SPEED", "THROTTLE", "MAP", "RPM"};
+        "SPEED", "THROTTLE", "MAP", "RPM", "MANUAL"};
 
     // Temperatures, degrees C: channel, icon, amber and red limits. Haldex clutch limits are
     // guesses until we see real values.
@@ -183,6 +187,14 @@ public final class TeleLayout {
     public final String[] catName = new String[MAXPRESET];
     public int cursor;
     public String status;
+    // Haldex control page (TeleUi, tele17): written by TeleUi.tick before build.
+    public boolean uiOpen;
+    public int uiCursor;
+    public boolean uiEdit;
+    public int uiMode;
+    public int uiLock;
+    public String uiMsg;
+    public int uiMsgRgba;
     public int statusRgba = GREY;
     /** Datagrams per second from OpenHaldex, -1 if unknown. */
     public int rateHz = -1;
@@ -435,6 +447,10 @@ public final class TeleLayout {
         slopeText(ba + 50, half(ba + 50) + 56 + 0.82 * 40, 40, false, LEFT, vc,
             ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
 
+        if (uiOpen) {
+            controlLarge();
+            return;
+        }
         // Left of the notch: rpm, and the driver's inputs under it: accelerator (green) and brake
         // pressure (red, full bar at 100 bar).
         icon(GRID_X0 + 14, 210 + D_Y, 32, TeleIcons.TACH, ICONC, true);
@@ -758,30 +774,35 @@ public final class TeleLayout {
         int gc = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
         gearGlyph(112, 182, 170, gc);
         text(112, 342, 22, true, CENTER, AMBER, "NO LINK", !link);
-        box(222, 184, 2, 196, LINE, true);
-        int row = 0;
-        for (int t = 0; t < T_CH.length; t++) {
-            if (T_CH[t] == CH_OIL)
-                continue; // the stock Sport view shows oil temperature
-            tempCell(t, 240, x1, 184 + row * 50, 34, 36, rpm);
-            row++;
+        if (uiOpen) {
+            controlSmall();
+        } else {
+            box(222, 184, 2, 196, LINE, true);
+            int row = 0;
+            for (int t = 0; t < T_CH.length; t++) {
+                if (T_CH[t] == CH_OIL)
+                    continue; // the stock Sport view shows oil temperature
+                tempCell(t, 240, x1, 184 + row * 50, 34, 36, rpm);
+                row++;
+            }
+
+            // Preset and mode under the gear; Wi-Fi warning beside them while the link is slow or lost.
+            text(x0, 370, 28, false, LEFT, link ? PRESET : GREY, presetName(), true);
+            text(x0 + 2, 400, 15, true, LEFT, GREY, presetMode(), true);
+            boolean slow = link && rateHz >= 0 && rateHz < 10;
+            icon(190, 372, 22, TeleIcons.WIFI, AMBER, !link || slow);
+
+            // Boost: icon, strip from vacuum to boost with zero marked, value in bar.
+            int kpa = ok(CH_BOOST) ? r(val[CH_BOOST]) : 0;
+            boolean boosting = link && kpa > 0;
+            int zero = (0 - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN);
+            int pos = clamp((kpa - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN), 0, 100);
+            icon(x0, 424, 30, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
+            bar(x0 + 44, 434, 250, 10, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
+            text(x1 - 36, 420, 34, false, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
+            text(x1, 434, 14, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
+
         }
-
-        // Preset and mode under the gear; Wi-Fi warning beside them while the link is slow or lost.
-        text(x0, 370, 28, false, LEFT, link ? PRESET : GREY, presetName(), true);
-        text(x0 + 2, 400, 15, true, LEFT, GREY, presetMode(), true);
-        boolean slow = link && rateHz >= 0 && rateHz < 10;
-        icon(190, 372, 22, TeleIcons.WIFI, AMBER, !link || slow);
-
-        // Boost: icon, strip from vacuum to boost with zero marked, value in bar.
-        int kpa = ok(CH_BOOST) ? r(val[CH_BOOST]) : 0;
-        boolean boosting = link && kpa > 0;
-        int zero = (0 - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN);
-        int pos = clamp((kpa - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN), 0, 100);
-        icon(x0, 424, 30, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
-        bar(x0 + 44, 434, 250, 10, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
-        text(x1 - 36, 420, 34, false, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
-        text(x1, 434, 14, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
 
         // Redline warning frame on top: a thick red line along the panel outline with a glow,
         // flashing with the shift lights.
@@ -977,6 +998,99 @@ public final class TeleLayout {
         StringBuffer sb = new StringBuffer();
         sb.append(p).append('%');
         return sb.toString();
+    }
+
+    /** A mode's short name (channel 12 numbering), "?" when out of range. */
+    static String modeName(int m) {
+        return mode(m);
+    }
+
+    /**
+     * Haldex control page, Classic (TeleUi): presets on the left of the gear, mode and the lock
+     * slider on the right, the status or a hint in the temperature row. Gear, strip and shift lights
+     * stay.
+     */
+    private void controlLarge() {
+        int active = ok(CH_PRESET) ? r(val[CH_PRESET]) : -1;
+        int modeNow = ok(CH_MODE) ? r(val[CH_MODE]) : -1;
+        int lockNow = ok(CH_LOCK_SET) ? r(val[CH_LOCK_SET]) : 255;
+        // presets
+        text(352, 232, 14, true, LEFT, GREY, "PRESETS", true);
+        int rows = 4;
+        int first = Math.max(0, Math.min(catN - rows, uiCursor - 1));
+        if (uiCursor >= catN)
+            first = Math.max(0, catN - rows);
+        for (int k = 0; k < rows; k++) {
+            int i = first + k;
+            boolean on = i < catN;
+            int y0 = 252 + k * 31;
+            box(344, y0, 244, 28, CURSOR, on && uiCursor == i);
+            box(348, y0 + 6, 4, 16, ACTIVE, on && link && catId[i] == active);
+            text(360, y0 + 3, 22, uiCursor == i, LEFT, on && catId[i] == active ? WHITE : ICONC,
+                on ? upper(catName[i]) : null, on);
+            text(584, y0 + 8, 12, false, RIGHT, GREY, on ? mode(catMode[i]) : null, on);
+        }
+        text(466, 290, 18, true, CENTER, link ? GREY : AMBER, link ? "NO PRESETS YET" : "NO LINK", catN == 0);
+        // mode
+        boolean mFocus = uiCursor == catN;
+        boolean lFocus = uiCursor == catN + 1;
+        text(862, 232, 14, true, LEFT, GREY, "MODE", true);
+        box(856, 250, 244, 40, CURSOR, mFocus);
+        String mv = mFocus && uiEdit ? new StringBuffer("< ").append(mode(uiMode)).append(" >").toString()
+            : modeNow >= 0 ? mode(modeNow) : "-";
+        text(978, 256, 28, true, CENTER, mFocus && uiEdit ? SAKURA : link ? WHITE : GREY, mv, true);
+        // lock slider: 0..100 % in 10 % steps; shows the setpoint in MANUAL, the edit value while editing
+        text(862, 300, 14, true, LEFT, GREY, "LOCK", true);
+        box(856, 316, 244, 48, CURSOR, lFocus);
+        int lv = lFocus && uiEdit ? uiLock : lockNow <= 100 ? lockNow : -1;
+        box(866, 334, 160, 12, DIM, true);
+        box(866, 334, lv > 0 ? 160 * lv / 100 : 0, 12, lFocus && uiEdit ? SAKURA : HALDEX, lv > 0);
+        for (int t = 1; t < 10; t++)
+            box(866 + 16 * t, 331, 1, 18, BG, true);
+        text(1094, 324, 26, true, RIGHT, lFocus && uiEdit ? SAKURA : link ? WHITE : GREY,
+            lv >= 0 ? percent(lv) : "OFF", true);
+        // status or hint
+        String hint = uiEdit ? "ROLL TO CHANGE  -  PRESS TO SEND  -  BACK TO CANCEL"
+            : "ROLL TO CHOOSE  -  PRESS TO SELECT  -  BACK TO CLOSE";
+        text(720, GRID_Y + 4, 20, uiMsg != null, CENTER, uiMsg != null ? uiMsgRgba : GREY, uiMsg != null ? uiMsg : hint, true);
+    }
+
+    /** Haldex control page, Sport: in the temperature column and the rows under the gear. */
+    private void controlSmall() {
+        int active = ok(CH_PRESET) ? r(val[CH_PRESET]) : -1;
+        int modeNow = ok(CH_MODE) ? r(val[CH_MODE]) : -1;
+        int lockNow = ok(CH_LOCK_SET) ? r(val[CH_LOCK_SET]) : 255;
+        int x0 = 236;
+        int x1 = 420;
+        int rows = 3;
+        int first = Math.max(0, Math.min(catN - rows, uiCursor - 1));
+        if (uiCursor >= catN)
+            first = Math.max(0, catN - rows);
+        for (int k = 0; k < rows; k++) {
+            int i = first + k;
+            boolean on = i < catN;
+            int y0 = 184 + k * 34;
+            box(x0, y0, x1 - x0, 30, CURSOR, on && uiCursor == i);
+            box(x0 + 4, y0 + 7, 4, 16, ACTIVE, on && link && catId[i] == active);
+            text(x0 + 14, y0 + 4, 22, uiCursor == i, LEFT, on && catId[i] == active ? WHITE : ICONC,
+                on ? upper(catName[i]) : null, on);
+        }
+        boolean mFocus = uiCursor == catN;
+        boolean lFocus = uiCursor == catN + 1;
+        box(x0, 290, x1 - x0, 34, CURSOR, mFocus);
+        text(x0 + 6, 300, 13, true, LEFT, GREY, "MODE", true);
+        String mv = mFocus && uiEdit ? new StringBuffer("< ").append(mode(uiMode)).append(" >").toString()
+            : modeNow >= 0 ? mode(modeNow) : "-";
+        text(x1 - 6, 294, 24, true, RIGHT, mFocus && uiEdit ? SAKURA : link ? WHITE : GREY, mv, true);
+        box(x0, 330, x1 - x0, 40, CURSOR, lFocus);
+        text(x0 + 6, 336, 13, true, LEFT, GREY, "LOCK", true);
+        int lv = lFocus && uiEdit ? uiLock : lockNow <= 100 ? lockNow : -1;
+        box(x0 + 6, 356, 110, 8, DIM, true);
+        box(x0 + 6, 356, lv > 0 ? 110 * lv / 100 : 0, 8, lFocus && uiEdit ? SAKURA : HALDEX, lv > 0);
+        text(x1 - 6, 334, 24, true, RIGHT, lFocus && uiEdit ? SAKURA : link ? WHITE : GREY,
+            lv >= 0 ? percent(lv) : "OFF", true);
+        String hint = uiEdit ? "ROLL: CHANGE  PRESS: SEND" : "ROLL: CHOOSE  PRESS: SELECT";
+        text(32, 400, 16, uiMsg != null, LEFT, uiMsg != null ? uiMsgRgba : GREY, uiMsg != null ? uiMsg : hint, true);
     }
 
     private static String mode(int m) {

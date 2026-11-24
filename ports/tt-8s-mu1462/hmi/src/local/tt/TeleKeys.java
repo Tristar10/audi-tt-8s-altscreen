@@ -16,6 +16,9 @@ import de.esolutions.hmi.widgets.audi.base.eal.EALManager;
  *
  * - /tmp/tt-tele-keys exists: every key event is logged (code, pressed/released/turned/long,
  *   terminal), to find which code the wheel's buttons send on the TT.
+ * - Key map (/mnt/app/root/tt/tele-keymap, or /tmp/tt-tele-keymap): lines "CODE EVENT ACTION",
+ *   EVENT pressed | released | turned | long, ACTION open | up | down | press | back | close: the
+ *   Haldex control page (TeleUi, tele17).
  * - The toggle key (/mnt/app/root/tt/tele-key-code, or /tmp/tt-tele-key-code, a number): pressed
  *   twice within 450 ms switches the view on or off (TeleView.press). Until a code is set, nothing
  *   toggles.
@@ -29,6 +32,9 @@ final class TeleKeys extends BaseJobFilter {
     private static boolean installed;
     private static volatile int toggleCode = -1;
     private static volatile boolean trace;
+    private static final File MAP_RAM = new File("/tmp/tt-tele-keymap");
+    private static final File MAP_FLASH = new File("/mnt/app/root/tt/tele-keymap");
+    private static volatile int[][] keymap = new int[0][];
 
     private TeleKeys() {
     }
@@ -61,6 +67,8 @@ final class TeleKeys extends BaseJobFilter {
         trace = TRACE.exists();
         int c = readCode(CODE_RAM);
         toggleCode = c >= 0 ? c : readCode(CODE_FLASH);
+        int[][] km = readMap(MAP_RAM);
+        keymap = km.length > 0 ? km : readMap(MAP_FLASH);
     }
 
     public void enqueue(Job job, int prio) {
@@ -78,6 +86,12 @@ final class TeleKeys extends BaseJobFilter {
             }
             if (id == KeyEvent.KEY_PRESSED && toggleCode >= 0 && k.getKeyCode() == toggleCode) {
                 TeleView.press();
+            }
+            int[][] km = keymap;
+            for (int i = 0; i < km.length; i++) {
+                if (km[i][0] == k.getKeyCode() && km[i][1] == id) {
+                    TeleUi.post(km[i][2]);
+                }
             }
         } catch (Throwable t) {
             // never disturb the stock key handling
@@ -99,6 +113,45 @@ final class TeleKeys extends BaseJobFilter {
             default:
                 return new StringBuffer("event ").append(id).toString();
         }
+    }
+
+    /** "CODE EVENT ACTION" lines -> {code, event id, action}. */
+    private static int[][] readMap(File f) {
+        if (!f.exists()) {
+            return new int[0][];
+        }
+        int[][] out = new int[16][];
+        int n = 0;
+        try {
+            java.io.BufferedReader r = new java.io.BufferedReader(new java.io.FileReader(f));
+            try {
+                for (String l = r.readLine(); l != null && n < out.length; l = r.readLine()) {
+                    java.util.StringTokenizer t = new java.util.StringTokenizer(l);
+                    if (t.countTokens() < 3) {
+                        continue;
+                    }
+                    try {
+                        int code = Integer.parseInt(t.nextToken());
+                        String ev = t.nextToken();
+                        int id = ev.equals("released") ? KeyEvent.KEY_RELEASED : ev.equals("turned") ? KeyEvent.KEY_TURNED
+                            : ev.equals("long") ? KeyEvent.KEY_LONG_PRESSED : KeyEvent.KEY_PRESSED;
+                        int act = TeleUi.action(t.nextToken());
+                        if (act != 0) {
+                            out[n++] = new int[] {code, id, act};
+                        }
+                    } catch (NumberFormatException e) {
+                        // skip the line
+                    }
+                }
+            } finally {
+                r.close();
+            }
+        } catch (Throwable t) {
+            return new int[0][];
+        }
+        int[][] m = new int[n][];
+        System.arraycopy(out, 0, m, 0, n);
+        return m;
     }
 
     private static int readCode(File f) {

@@ -25,4 +25,6 @@ final class TeleSlot {
     int sw = -1;
     int sh = -1;
     float shownRot = Float.NaN;
+    /** Slot 0 (the full-screen background) with the itasha theme on: its picture (tele17). */
+    IWrappedNode3DImage themeImg;
 }

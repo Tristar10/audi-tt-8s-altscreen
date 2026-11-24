@@ -39,6 +39,13 @@ import de.esolutions.hmi.widgets.audi.base.eal.TextureDescription;
  *                        "stop"), then the file is deleted; the log has the delay (TeleBeep)
  *   /tmp/tt-tele-shiftbeep  tele10: "N [system|ring]": play that tone each time rpm rises past
  *                        the shift point (re-armed 300 rpm below it)
+ *   /tmp/tt-tele-theme   tele17: the itasha theme (or /mnt/app/root/tt/tele-theme): the background
+ *                        pictures /mnt/app/root/tt/theme-classic.rgba and theme-sport.rgba (1440 x
+ *                        540, RGBA, made by the simulator's Theme --export) under the view, and a
+ *                        see-through gear notch
+ *   /tmp/tt-tele-ui      tele17: one control-page action (open, up, down, press, back, close),
+ *                        read every tick and deleted (TeleUi)
+ *   /tmp/tt-tele-glide   tele17: glide between data updates (or /mnt/app/root/tt/tele-glide); TeleGlide
  *   /tmp/tt-tele-probe   tele8 probe instead of the view: the painted rev strip (TeleStrip), the
  *                        lit picture cut by a clip rectangle at the rpm. "grp" (default): the clip
  *                        on a group holding the picture; "img": on the picture itself
@@ -57,6 +64,21 @@ public final class TeleView implements Runnable {
     private static final File ROT_FILE = new File("/tmp/tt-tele-rot");
     private static final File FONT_FILE = new File("/tmp/tt-tele-font");
     private static final File PROBE_FILE = new File("/tmp/tt-tele-probe");
+    private static final File THEME_RAM = new File("/tmp/tt-tele-theme");
+    private static final File THEME_FLASH = new File(DIR, "tele-theme");
+    private static final File[] THEME_FILES = {new File(DIR, "theme-classic.rgba"), new File(DIR, "theme-sport.rgba")};
+    private static final int TW = TeleLayout.SCREEN_W;
+    private static final int TH = TeleLayout.SCREEN_H;
+    /** The theme pictures read from flash, by view (kept while the theme is on). */
+    private static final byte[][] THEME = new byte[2][];
+    private static final boolean[] THEME_BAD = new boolean[2];
+    private static volatile boolean themeOn;
+    private static final File GLIDE_RAM = new File("/tmp/tt-tele-glide");
+    private static final File GLIDE_FLASH = new File(DIR, "tele-glide");
+    private static volatile boolean glide;
+    private static final TeleGlide GLIDE = new TeleGlide();
+    private static final File UI_FILE = new File("/tmp/tt-tele-ui");
+    private static final TeleUi UI = new TeleUi();
     private static final File BEEP_FILE = new File("/tmp/tt-tele-beep");
     private static final File SHIFTBEEP_FILE = new File("/tmp/tt-tele-shiftbeep");
     private static volatile String shiftBeep;
@@ -194,13 +216,27 @@ public final class TeleView implements Runnable {
                     } else {
                         TeleLink.snapshot(layout, now);
                     }
+                    if (glide) {
+                        GLIDE.apply(layout, now, false);
+                    }
+                    TeleLink.demoLink = demo;
+                    if (UI_FILE.exists()) {
+                        String ua = readLine(UI_FILE);
+                        UI_FILE.delete();
+                        TeleUi.post(TeleUi.action(ua));
+                    }
+                    UI.tick(layout, now);
                     shiftTone(layout);
                     if (probeMode >= 0) {
                         f = probeFrame(layout, now);
                     } else {
                         boolean small = ZoomGate.small();
-                        layout.build(small ? TeleLayout.VIEW_SMALL : TeleLayout.VIEW_LARGE, TeleLayout.PAGE_LIVE);
-                        f = TeleFrame.of(layout, (small ? 1 : 0) | (rotGen << 4));
+                        int view = small ? TeleLayout.VIEW_SMALL : TeleLayout.VIEW_LARGE;
+                        int theme = themeOn && themeLoaded(view) ? view : -1;
+                        layout.themed = theme >= 0;
+                        layout.build(view, TeleLayout.PAGE_LIVE);
+                        f = TeleFrame.of(layout, (small ? 1 : 0) | (UI.isOpen() ? 2 : 0) | (rotGen << 4));
+                        f.theme = theme;
                         prepareArt(f);
                     }
                 } else {
@@ -273,6 +309,49 @@ public final class TeleView implements Runnable {
         other.build(small ? TeleLayout.VIEW_LARGE : TeleLayout.VIEW_SMALL, TeleLayout.PAGE_LIVE);
         prepareArt(TeleFrame.of(other, -1));
         prewarmedGen = gen;
+    }
+
+    /** Reads a view's theme picture from flash once (tick thread); false if missing or wrong size. */
+    private static boolean themeLoaded(int view) {
+        if (THEME[view] != null) {
+            return true;
+        }
+        if (THEME_BAD[view]) {
+            return false;
+        }
+        File f = THEME_FILES[view];
+        long len = f.length();
+        if (!f.exists() || len != (long) TW * TH * 4) {
+            THEME_BAD[view] = true;
+            RgdBus.note(new StringBuffer("tele theme: ").append(f.getPath()).append(f.exists() ? " has the wrong size " : " missing ")
+                .append(len).toString());
+            return false;
+        }
+        try {
+            byte[] b = new byte[(int) len];
+            java.io.FileInputStream in = new java.io.FileInputStream(f);
+            try {
+                int o = 0;
+                while (o < b.length) {
+                    int n = in.read(b, o, b.length - o);
+                    if (n < 0) {
+                        break;
+                    }
+                    o += n;
+                }
+            } finally {
+                in.close();
+            }
+            THEME[view] = b;
+            Runtime rt = Runtime.getRuntime();
+            RgdBus.note(new StringBuffer("tele theme: loaded ").append(f.getPath()).append(", heap free ")
+                .append(rt.freeMemory() / 1024).append(" KB of ").append(rt.totalMemory() / 1024).append(" KB").toString());
+            return true;
+        } catch (Throwable t) {
+            THEME_BAD[view] = true;
+            RgdBus.note(new StringBuffer("tele theme: read failed ").append(String.valueOf(t)).toString());
+            return false;
+        }
     }
 
     static void jobDone(long ms) {
@@ -688,6 +767,30 @@ public final class TeleView implements Runnable {
     }
 
     private static void image(EALManager m, TeleSlot s, TeleFrame f, int i) {
+        if (i == 0) {
+            // tele17: the theme picture in place of the black background
+            boolean want = f.theme >= 0 && THEME[f.theme] != null;
+            if (want && s.themeImg == null && uploadsLeft > 0) {
+                uploadsLeft--;
+                ByteBuffer buf = ByteBuffer.allocateDirect(TW * TH * 4);
+                buf.put(THEME[f.theme]);
+                buf.rewind();
+                TextureDescription d = m.createTextureDescription(buf, 6, TW, TH, null, new Object());
+                s.themeImg = m.createImage3D(s.group, "ttTele", d, 0, true, "ttTele");
+                if (s.themeImg != null) {
+                    s.themeImg.setPosition(0f, 0f, 0f);
+                }
+            }
+            if (s.themeImg != null) {
+                s.themeImg.setVisible(want);
+                if (s.shownImg != null) {
+                    s.shownImg.setVisible(!want);
+                }
+                if (want) {
+                    return;
+                }
+            }
+        }
         int c = f.rgba[i];
         if (c != s.shownColour) {
             IWrappedNode3DImage img = null;
@@ -889,6 +992,14 @@ public final class TeleView implements Runnable {
             RgdBus.note(beepCmd(bl));
         }
         shiftBeep = readLine(SHIFTBEEP_FILE);
+        themeOn = THEME_RAM.exists() || THEME_FLASH.exists();
+        glide = GLIDE_RAM.exists() || GLIDE_FLASH.exists();
+        if (!themeOn) {
+            THEME[0] = null;
+            THEME[1] = null;
+            THEME_BAD[0] = false;
+            THEME_BAD[1] = false;
+        }
         String pm = readLine(PROBE_FILE);
         probeMode = pm == null ? -1 : pm.equals("img") ? 1 : 0;
         // Default -deg: on the car (tele1) +deg tilted the corner text against the slopes.
