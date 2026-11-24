@@ -84,6 +84,15 @@ final class TeleLink implements Runnable {
         t.start();
     }
 
+    /** The port the receiver holds now, 0 when none (bench and log). */
+    static int boundPortNow() {
+        return sock == null ? 0 : boundPort;
+    }
+
+    static boolean boundOpen() {
+        return sock != null;
+    }
+
     /** Open the port while the view is enabled; close it otherwise (so ttlink can bind it). */
     static void want(boolean w) {
         wanted = w;
