@@ -83,6 +83,7 @@ public final class TeleStrip {
                 double best = 1e9;
                 double bs = 0;
                 double perp = 0;
+                double side = 0; // signed: + towards the strip's outer (upper) edge
                 double over = 0;
                 for (int i = 0; i < n; i++) {
                     double rx = x - ax[i];
@@ -95,7 +96,8 @@ public final class TeleStrip {
                     if (d < best) {
                         best = d;
                         bs = s0[i] + tc;
-                        perp = Math.abs(rx * uy[i] - ry * ux[i]);
+                        side = rx * uy[i] - ry * ux[i];
+                        perp = Math.abs(side);
                         over = i == 0 && along < 0 ? -along : i == n - 1 && along > sl[i] ? along - sl[i] : 0;
                         if (over == 0) {
                             perp = d; // round joins at the corners
@@ -124,28 +126,39 @@ public final class TeleStrip {
                 tc = TeleLayout.mix(tc, edge, (float) clamp01(2.0 - inside));
                 tc = TeleLayout.mix(tc, TeleLayout.LINE, (float) (tick * 0.6 * clamp01(inside - 1.5)));
                 p.track[py * W + px] = (a << 24) | (tc >>> 8);
-                // Lit: cool white, warming to amber over the last 1500 rpm before the shift point,
-                // red past it; a soft tube shading across, darker ticks.
+                // Lit (scheme 2026-11-24, "ice -> sakura -> red"): ice white up to 2500 rpm before
+                // the shift point, warming to sakura pink at it; the red picture takes over from there.
                 int rpm = t.sToRpm(bs);
-                int warm = t.shiftRpm - 1500;
-                int lc = x >= TeleLayout.TP_X[2] ? TeleLayout.RED
-                    : rpm <= warm ? TeleLayout.STRIP_LO
-                    : TeleLayout.mix(TeleLayout.STRIP_LO, TeleLayout.AMBER, (rpm - warm) / 1500f);
+                int lc = TeleLayout.iceSakura(rpm, t.shiftRpm);
                 // inset 2.5 px so the hairline edge stays around the fill
                 double litCov = clamp01(hw - 2.5 - perp + 0.5) * (over > 0 ? clamp01(0.5 - over - 2.5) : 1);
                 if (litCov <= 0) {
                     continue;
                 }
-                double k = perp / hw;
-                lc = TeleLayout.mix(lc, TeleLayout.BG, (float) (0.12 * k * k));
-                lc = TeleLayout.mix(lc, TeleLayout.BG, (float) (tick * 0.5));
-                p.lit[py * W + px] = ((int) Math.round(litCov * 255) << 24) | (lc >>> 8);
-                int rc = TeleLayout.mix(TeleLayout.RED, TeleLayout.BG, (float) (0.12 * k * k + tick * 0.5));
-                p.litRed[py * W + px] = ((int) Math.round(litCov * 255) << 24) | (rc >>> 8);
+                int la = (int) Math.round(litCov * 255) << 24;
+                p.lit[py * W + px] = la | (glass(lc, side, hw, x, y, tick) >>> 8);
+                p.litRed[py * W + px] = la | (glass(TeleLayout.RED, side, hw, x, y, tick) >>> 8);
             }
         }
         p.paintMs = System.currentTimeMillis() - t0;
         return p;
+    }
+
+    /**
+     * The "glass tube" look on a lit colour: a highlight band along the upper part, a darker lower
+     * edge, faint diagonal lines (the wrap's stripes), darker ticks.
+     */
+    private static int glass(int c, double side, double hw, double x, double y, double tick) {
+        double u = side / hw; // -1 lower edge .. +1 upper edge
+        double hi = Math.max(0, 1 - Math.abs(u - 0.45) / 0.28); // highlight band
+        int o = TeleLayout.mix(c, TeleLayout.WHITE, (float) (0.38 * hi));
+        if (u < -0.45) {
+            o = TeleLayout.mix(o, TeleLayout.BG, (float) (0.35 * (-u - 0.45) / 0.55));
+        }
+        if (((int) Math.floor((x - y) / 3.0) % 3) == 0) {
+            o = TeleLayout.mix(o, TeleLayout.BG, 0.07f);
+        }
+        return TeleLayout.mix(o, TeleLayout.BG, (float) (tick * 0.5));
     }
 
     private static double clamp01(double v) {

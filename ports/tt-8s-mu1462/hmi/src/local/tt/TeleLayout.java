@@ -88,6 +88,16 @@ public final class TeleLayout {
     public static final int LED_OFF = 0x1E242BFF;
     public static final int BLUE = 0x2F7BFFFF;
     public static final int STRIP_LO = 0xDCE6EEFF;
+    // Scheme 2026-11-24, matched to the livery and the two characters: ice white (the white-haired
+    // girl, the wrap's white), sakura pink (the pink-haired girl), red past the shift point; mint and
+    // cobalt for the first shift lights; dark glass for everything unlit.
+    public static final int ICE = 0xE4F3FFFF;
+    public static final int SAKURA = 0xFF6FAEFF;
+    public static final int MINT = 0x3DEBB0FF;
+    public static final int COBALT_LT = 0x3A86FFFF;
+    public static final int GLASS_OFF = 0x101826FF;
+    public static final int GLASS_EDGE = 0x2C3A52FF;
+    public static final int VAC_COBALT = 0x2A4FD8FF;
     public static final int TRACK = 0x1A2027FF;
     public static final int EDGE = 0x2E363FFF;
     public static final int DARK_TEXT = 0x0B0F14FF;
@@ -250,11 +260,18 @@ public final class TeleLayout {
             for (int i = 0; i < LEDS_SIDE; i++) {
                 int on = shiftRpm - (LEDS_SIDE - i) * LED_STEP;
                 boolean lit = link && (over ? blink : rpm >= on);
-                int c = !lit ? LED_OFF : over ? RED : i < 2 ? GREEN : i < 4 ? BLUE : RED;
+                int c = !lit ? GLASS_OFF : over ? RED : i < 2 ? MINT : i < 4 ? COBALT_LT : RED;
                 int x0 = side == 0 ? lx0 + i * (lw + lgap) : lx1 - lw - i * (lw + lgap);
                 int x1 = x0 + lw;
                 int t = side == 0 ? sk : -sk; // top edge shifted: "/" on the left, "\" on the right
+                // glass segment: a hairline rim, the body, a highlight across the top third when lit
+                quad(x0 + t - 1, ly - 1, x1 + t + 1, ly - 1, x1 + 1, ly + lh + 1, x0 - 1, ly + lh + 1, GLASS_EDGE, true);
                 quad(x0 + t, ly, x1 + t, ly, x1, ly + lh, x0, ly + lh, c, true);
+                int hy = ly + 3;
+                int hh = lh / 3;
+                int ht = t * (lh - 3) / lh;
+                int hb = t * (lh - 3 - hh) / lh;
+                quad(x0 + ht + 3, hy, x1 + ht - 3, hy, x1 + hb - 3, hy + hh, x0 + hb + 3, hy + hh, 0xFFFFFF5C, lit);
             }
         }
 
@@ -334,6 +351,13 @@ public final class TeleLayout {
                 tp(from, pa);
                 rbox(pa[0], pa[1], (s1 - from) * frac, th, ang, fc, fillOn && frac > 0 && frac < 1);
             }
+        }
+        // A white-hot edge where the fill ends: reads the exact rpm (scheme 2026-11-24).
+        if (link && rpm > barFromRpm && rpm < barToRpm) {
+            double se = rpmToS(rpm);
+            tp(se, pa);
+            double hv = half(se) / Math.max(0.5, -pa[3]);
+            box(rd(pa[0]) - 2, rd(pa[1] - hv) + 2, 3, rd(2 * hv) - 4, 0xFFFFFFFF, !(over && !blink));
         }
         // Shift point: a red cut across the strip where the fat middle ends.
         box(TP_X[2] - 1, TP_Y[2] - HALF_MAX - 4, 3, 2 * HALF_MAX + 8, RED, true); // vertical (user 2026-11-24)
@@ -459,7 +483,7 @@ public final class TeleLayout {
         for (int i = 0; i < segN; i++) {
             int v = BOOST_MIN + range * (2 * i + 1) / (2 * segN);
             boolean on = link && (i >= zeroSeg ? i < lvl : i >= lvl);
-            box(bx + i * pitch, by, pitch - 3, bh, !on ? DIM : v < 0 ? VAC_FILL : boostColour(v), true);
+            box(bx + i * pitch, by, pitch - 3, bh, !on ? GLASS_OFF : v < 0 ? VAC_COBALT : boostColour(v), true);
         }
         int zx = bx + zeroSeg * pitch - 1;
         int ly2 = by + bh + 5;
@@ -470,8 +494,13 @@ public final class TeleLayout {
         text(bx, ly2 + 6, 16, false, LEFT, GREY, boostPsi ? "-14" : "-1", true);
         text(zx, ly2 + 6, 16, false, CENTER, GREY, "0", true);
         text(bx + bwAll, ly2 + 6, 16, false, RIGHT, GREY, boostPsi ? "+22" : "+1.5", true);
+        // glass: a highlight across the bar's upper third, a dark lower edge
+        box(bx, by + 4, bwAll, bh / 4, 0xFFFFFF30, true);
+        box(bx, by + bh - 5, bwAll, 5, 0x00000050, true);
+        // peak: a small sakura triangle above the bar
         int pk = (int) Math.round(segN * (clamp(peakKpa, BOOST_MIN, BOOST_MAX) - BOOST_MIN) / (double) range);
-        box(bx + pk * pitch - 2, by - 4, 2, bh + 8, WHITE, link && peakKpa > 0);
+        int px = bx + pk * pitch - 2;
+        quad(px - 7, by - 12, px + 7, by - 12, px, by - 3, px, by - 3, SAKURA, link && peakKpa > 0);
 
         // Temperatures in one row, an icon and a value in each cell, short dividers between.
         int cw = (GRID_X1 - GRID_X0) / T_CH.length;
@@ -484,7 +513,16 @@ public final class TeleLayout {
     }
 
     /** Boost colour for a segment starting at kpa: amber at zero, through orange, red from 1.2 bar. */
+    /** Boost scheme: ice at zero, sakura at 0.9 bar, red at full boost. */
     private static int boostColour(int kpa) {
+        if (kpa <= 0)
+            return ICE;
+        if (kpa < 90)
+            return mix(ICE, SAKURA, kpa / 90f);
+        return mix(SAKURA, RED, Math.min(1f, (kpa - 90) / 60f));
+    }
+
+    private static int boostColourOld(int kpa) {
         if (kpa >= 120)
             return RED;
         if (kpa < 60)
@@ -510,11 +548,20 @@ public final class TeleLayout {
 
     /** The lit strip's one colour at this rpm, in four steps (few node colours on the car). */
     private int stripColourAt(int rpmNow) {
-        int from = shiftRpm - 1500; // warm up to the shift point, red from there
+        // ice -> sakura in four steps (few node colours on the car); red from the shift point
+        int from = shiftRpm - 2500;
         if (rpmNow <= from)
-            return STRIP_LO;
-        int step = Math.min(3, (rpmNow - from) * 4 / 1500);
-        return mix(STRIP_LO, AMBER, step / 3f);
+            return ICE;
+        int step = Math.min(3, (rpmNow - from) * 4 / 2500);
+        return mix(ICE, SAKURA, step / 3f);
+    }
+
+    /** The scheme's lit colour at an rpm: ice white, warming to sakura pink over 2500 rpm before shift. */
+    static int iceSakura(int rpmAt, int shift) {
+        int from = shift - 2500;
+        if (rpmAt <= from)
+            return ICE;
+        return mix(ICE, SAKURA, Math.min(1f, (rpmAt - from) / 2500f));
     }
 
     /** Lit strip colour at rpm: cool white, warming to amber over the last 1500 rpm before shift. */
