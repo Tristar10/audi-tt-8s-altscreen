@@ -65,6 +65,11 @@ public final class TeleView implements Runnable {
     private static final int VIEWPORT_INDEX = 228;
     private static final int SOLID = 8;
     private static final Hashtable ART = new Hashtable();
+    /** Quad coverage masks by geometry (tele11): one per shape, recoloured cheaply for each colour. */
+    private static final Hashtable MASKS = new Hashtable();
+    /** New pictures uploaded per HMI job at most (tele11): a big first build shows over a few frames. */
+    private static final int UPLOADS_PER_JOB = 48;
+    private static volatile boolean needMore;
 
     private static boolean started;
     private static volatile boolean on;
@@ -94,7 +99,6 @@ public final class TeleView implements Runnable {
     private static long statMax;
     private static long statAt;
     private static long statSlots;
-    private static int artKey = -1;
     private static volatile long postedAt;
     private static long lostJobs;
 
@@ -104,6 +108,9 @@ public final class TeleView implements Runnable {
     private static TeleSlot[] slots;
     private static int builtKey = -1;
     private static int builtRotGen = -1;
+    /** tele11: every view built so far keeps its nodes (key -> ViewNodes); a switch only swaps them. */
+    private static final Hashtable VIEWS = new Hashtable();
+    private static int uploadsLeft;
     private static boolean shownVisible;
     private static int pBuiltMode = -1;
     private static IWrappedNode3D pClip;
@@ -199,7 +206,10 @@ public final class TeleView implements Runnable {
                 } else {
                     f = TeleFrame.hidden();
                 }
-                if (f.sameAs(last)) {
+                if (f.sameAs(last) && !needMore) {
+                    if (show && probeMode < 0) {
+                        prewarm(now);
+                    }
                     continue;
                 }
                 EALManager m = TtPanel.ealManager();
@@ -237,6 +247,32 @@ public final class TeleView implements Runnable {
         boolean blink = (now / 100) % 2 == 0;
         boolean lit = layout.link && !(rpm >= layout.limitRpm && !blink);
         return TeleFrame.probe(probeMode, rpm, TeleStrip.cutX(layout, rpm), lit);
+    }
+
+    private static TeleLayout other;
+    private static int prewarmedGen = -1;
+
+    /**
+     * tele11: while nothing changes, paint the other view's pictures in the background (no
+     * uploads), so the first switch to it does not have to.
+     */
+    private static void prewarm(long now) {
+        int gen = rotGen;
+        if (prewarmedGen == gen) {
+            return;
+        }
+        if (other == null) {
+            other = new TeleLayout();
+        }
+        boolean small = ZoomGate.small();
+        other.now = now;
+        other.link = true;
+        for (int i = 0; i < TeleLayout.CHANNELS; i++) {
+            other.has[i] = false;
+        }
+        other.build(small ? TeleLayout.VIEW_LARGE : TeleLayout.VIEW_SMALL, TeleLayout.PAGE_LIVE);
+        prepareArt(TeleFrame.of(other, -1));
+        prewarmedGen = gen;
     }
 
     static void jobDone(long ms) {
@@ -288,9 +324,11 @@ public final class TeleView implements Runnable {
 
     /** Off the HMI thread: draws every picture this frame shows that is not cached yet. */
     private static void prepareArt(TeleFrame f) {
-        if (f.key != artKey) {
-            ART.clear(); // quads belong to one view's geometry
-            artKey = f.key;
+        // tele11: pictures are keyed by shape and colour, not by view, so both views keep theirs
+        // (clearing on every switch made Classic repaint everything each time). Cap the memory.
+        if (ART.size() > 1500) {
+            ART.clear();
+            MASKS.clear();
         }
         for (int i = 0; i < f.count; i++) {
             if (!f.vis[i]) {
@@ -321,7 +359,7 @@ public final class TeleView implements Runnable {
             return new Long(((long) (2 + f.size[i] * 1000000 + f.w[i] * 1000 + f.h[i]) << 32) | (c & 0xFFFFFFFFL));
         }
         if (f.kind[i] == TeleLayout.QUAD) {
-            return new Long(((long) (100000 + i) << 32) | (c & 0xFFFFFFFFL));
+            return new Long(((long) (shapeKey(f, i) | 0x40000000) << 32) | (c & 0xFFFFFFFFL));
         }
         return null;
     }
@@ -359,43 +397,88 @@ public final class TeleView implements Runnable {
         return b;
     }
 
-    /** A quad filled into its bounding box, 4x4 samples per pixel for soft edges. */
+    /** The shape of a quad (corners relative to its box, and the box size) as an int. */
+    private static int shapeKey(TeleFrame f, int i) {
+        int h = f.w[i] * 31 + f.h[i];
+        for (int k = 0; k < 4; k++) {
+            h = h * 131 + (f.qx[4 * i + k] - f.x[i]);
+            h = h * 131 + (f.qy[4 * i + k] - f.y[i]);
+        }
+        return h & 0x3FFFFFFF;
+    }
+
+    /**
+     * A quad filled into its bounding box with soft edges. tele11: coverage from the distance to
+     * the edges (one value per pixel; the shapes are convex), computed once per shape and kept, so a
+     * colour change only recolours (tele10 tested 16 samples per pixel for every colour: Classic
+     * took seconds to build on the head unit).
+     */
     private static byte[] quad(TeleFrame f, int i, int sc) {
         int tw = (f.w[i] + sc - 1) / sc;
         int th = (f.h[i] + sc - 1) / sc;
-        float[] xs = new float[4];
-        float[] ys = new float[4];
-        for (int k = 0; k < 4; k++) {
-            xs[k] = (f.qx[4 * i + k] - f.x[i]) / (float) sc;
-            ys[k] = (f.qy[4 * i + k] - f.y[i]) / (float) sc;
+        Integer mk = new Integer(shapeKey(f, i) * 3 + sc);
+        byte[] mask = (byte[]) MASKS.get(mk);
+        if (mask == null) {
+            float[] xs = new float[4];
+            float[] ys = new float[4];
+            for (int k = 0; k < 4; k++) {
+                xs[k] = (f.qx[4 * i + k] - f.x[i]) / (float) sc;
+                ys[k] = (f.qy[4 * i + k] - f.y[i]) / (float) sc;
+            }
+            mask = coverage(xs, ys, tw, th);
+            MASKS.put(mk, mask);
         }
         int c = f.rgba[i];
         int a = c & 0xFF;
         byte[] b = new byte[tw * th * 4];
-        for (int py = 0; py < th; py++) {
-            for (int px = 0; px < tw; px++) {
-                int hits = 0;
-                for (int sy = 0; sy < 4; sy++) {
-                    for (int sx = 0; sx < 4; sx++) {
-                        if (inside(xs, ys, px + (sx + 0.5f) / 4f, py + (sy + 0.5f) / 4f)) {
-                            hits++;
-                        }
-                    }
-                }
-                put(b, (py * tw + px) * 4, c >>> 8, a * hits / 16);
-            }
+        for (int j = 0; j < mask.length; j++) {
+            put(b, j * 4, c >>> 8, a * (mask[j] & 0xFF) / 255);
         }
         return b;
     }
 
-    private static boolean inside(float[] xs, float[] ys, float u, float v) {
-        boolean in = false;
-        for (int i = 0, j = 3; i < 4; j = i++) {
-            if ((ys[i] > v) != (ys[j] > v) && u < (xs[j] - xs[i]) * (v - ys[i]) / (ys[j] - ys[i]) + xs[i]) {
-                in = !in;
+    /** Coverage 0..255 of a convex quad (two corners may coincide) per pixel of a tw x th box. */
+    private static byte[] coverage(float[] xs, float[] ys, int tw, int th) {
+        // inward unit normals of the edges, from the winding
+        float area = 0;
+        for (int k = 0, j = 3; k < 4; j = k++) {
+            area += xs[j] * ys[k] - xs[k] * ys[j];
+        }
+        float sgn = area >= 0 ? 1f : -1f;
+        float[] nx = new float[4];
+        float[] ny = new float[4];
+        float[] nc = new float[4];
+        int ne = 0;
+        for (int k = 0; k < 4; k++) {
+            int j = (k + 1) & 3;
+            float ex = xs[j] - xs[k];
+            float ey = ys[j] - ys[k];
+            float len = (float) Math.sqrt(ex * ex + ey * ey);
+            if (len < 0.01f) {
+                continue; // two corners in one place (a triangle)
+            }
+            nx[ne] = -ey / len * sgn;
+            ny[ne] = ex / len * sgn;
+            nc[ne] = -(nx[ne] * xs[k] + ny[ne] * ys[k]);
+            ne++;
+        }
+        byte[] m = new byte[tw * th];
+        for (int py = 0; py < th; py++) {
+            float v = py + 0.5f;
+            for (int px = 0; px < tw; px++) {
+                float u = px + 0.5f;
+                float d = 1e9f;
+                for (int k = 0; k < ne; k++) {
+                    float dk = nx[k] * u + ny[k] * v + nc[k];
+                    if (dk < d) {
+                        d = dk;
+                    }
+                }
+                float cov = d + 0.5f;
+                m[py * tw + px] = (byte) (cov <= 0 ? 0 : cov >= 1 ? 255 : (int) (cov * 255));
             }
         }
-        return in;
+        return m;
     }
 
     // ---------------------------------------------------------------- HMI thread
@@ -424,20 +507,47 @@ public final class TeleView implements Runnable {
             String r = probeOnHmi(m, f);
             return note == null ? r : r == null ? note : new StringBuffer(note).append(' ').append(r).toString();
         }
-        if (slots == null || f.key != builtKey || slots.length != f.count || builtRotGen != rotGen) {
+        if (pBuiltMode >= 0) {
+            // back from the probe: it cleared the tree
             root.removeAllChildren();
+            VIEWS.clear();
             pBuiltMode = -1;
-            slots = new TeleSlot[f.count];
-            for (int i = 0; i < f.count; i++) {
-                TeleSlot s = new TeleSlot();
-                s.group = m.createNode3D(root, "ttTeleS", 0f, 0f);
-                slots[i] = s;
+        }
+        if (slots == null || f.key != builtKey || slots.length != f.count || builtRotGen != rotGen) {
+            // tele11: each view keeps its own group of nodes; a switch hides one and shows the other
+            if (builtRotGen != rotGen) {
+                root.removeAllChildren(); // rotation or font changed: every node is placed anew
+                VIEWS.clear();
             }
+            Integer vk = new Integer(f.key);
+            ViewNodes vn = (ViewNodes) VIEWS.get(vk);
+            if (vn == null || vn.slots.length != f.count) {
+                if (vn != null) {
+                    root.remove(vn.group);
+                }
+                vn = new ViewNodes();
+                vn.group = m.createNode3D(root, "ttTeleV", 0f, 0f);
+                vn.slots = new TeleSlot[f.count];
+                for (int i = 0; i < f.count; i++) {
+                    TeleSlot s = new TeleSlot();
+                    s.group = m.createNode3D(vn.group, "ttTeleS", 0f, 0f);
+                    vn.slots[i] = s;
+                }
+                VIEWS.put(vk, vn);
+                note = new StringBuffer(note == null ? "" : note).append(" built ").append(f.count).append(" slots")
+                    .toString();
+            }
+            java.util.Enumeration e = VIEWS.elements();
+            while (e.hasMoreElements()) {
+                ViewNodes o = (ViewNodes) e.nextElement();
+                o.group.setVisible(o == vn);
+            }
+            slots = vn.slots;
             builtKey = f.key;
             builtRotGen = rotGen;
-            note = new StringBuffer(note == null ? "" : note).append(" built ").append(f.count).append(" slots")
-                .toString();
         }
+        uploadsLeft = UPLOADS_PER_JOB;
+        needMore = false;
         int changed = 0;
         for (int i = 0; i < f.count; i++) {
             TeleSlot s = slots[i];
@@ -484,6 +594,7 @@ public final class TeleView implements Runnable {
         String note = null;
         if (pBuiltMode != f.pMode) {
             root.removeAllChildren();
+            VIEWS.clear();
             slots = null;
             builtKey = -1;
             IWrappedNode3D g = m.createNode3D(root, "ttTeleP", 0f, 0f);
@@ -589,6 +700,11 @@ public final class TeleView implements Runnable {
                 if (s.nImgs >= TeleSlot.MAX_COLOURS) {
                     return; // never expected: each slot uses only a few colours
                 }
+                if (uploadsLeft <= 0) {
+                    needMore = true; // the next job carries on (tele11)
+                    return;
+                }
+                uploadsLeft--;
                 img = upload(m, s, f, i);
                 if (img == null) {
                     return;

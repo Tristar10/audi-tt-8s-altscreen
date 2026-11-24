@@ -165,7 +165,23 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele10)
+## Autocross view on the head unit (tt-zoom tele11)
+
+User 2026-11-24: the view started slowly, and switching Sport -> Classic was slow (Classic -> Sport
+fast). Cause: Classic is 273 slots with 161 quads (361 000 picture pixels, each tested at 16 sample
+points) and Sport 29 slots with no quads; every view switch cleared all pictures and nodes, and every
+new colour of a quad painted it again. tele11:
+- Quad edges from the distance to the edges, one value per pixel (PC: 29x faster on Classic's
+  shapes, mean difference 0.4/255), the coverage kept per shape and only recoloured per colour.
+- Pictures keyed by shape and colour, not by view: nothing is cleared on a switch.
+- Each view keeps its own node group (ViewNodes); a switch hides one and shows the other.
+- At most 48 new pictures per HMI job: the first Classic build shows over a few frames instead of
+  stalling the HMI thread.
+- While nothing changes, the other view's pictures are painted in the background.
+Also carries the tele10 shift tone probe (below). Measure on the car: `grep "tele job\|built" /tmp/tt-rgd.log`.
+
+### Earlier: tele10
+
 
 tele10 = the Classic layout reviewed in the simulator (fatter, lower strip; upright numbers and
 ticks; everything on the centre line x 720; red line at 6800 with a hazard-striped red zone; flat
