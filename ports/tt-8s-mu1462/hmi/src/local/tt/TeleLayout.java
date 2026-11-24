@@ -363,7 +363,7 @@ public final class TeleLayout {
         // Top-left pocket, along the rising slope: the active OpenHaldex preset, its mode above it,
         // and a Wi-Fi warning only while the link is slow or lost.
         boolean slow = link && rateHz >= 0 && rateHz < 10;
-        double ps = l0 * 0.30; // tele5 photo: at 0.08 the name ran off the left edge
+        double ps = l0 * 0.50; // further along the slope: the theme puts a face in the corner (0.30 before)
         slopeText(ps, half(ps) + 44 + 0.82 * 32, 32, true, LEFT, link ? PRESET : GREY, presetName(), true);
         slopeText(ps + 30, half(ps) + 86 + 0.82 * 18, 18, true, LEFT, GREY, presetMode(), true);
         slopeIcon(l0 * 0.70, half(l0 * 0.70) + 48, 28, TeleIcons.WIFI, AMBER, !link || slow);
