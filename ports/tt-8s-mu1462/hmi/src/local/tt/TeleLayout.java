@@ -260,14 +260,15 @@ public final class TeleLayout {
 
         // Rev strip: a dark track with hairline edges; lit from cool white, warming to amber over the
         // last 1500 rpm before the shift point, all red past it, the whole strip flashing at the
-        // limiter. Numbers sit inside the strip, dark on the lit part.
+        // limiter. Numbers sit inside the strip, dark on the lit part. From the shift point (6500)
+        // the whole lit part is red and blinks in step with the shift lights (user 2026-11-24).
         if (paintedStrip) {
             int clipW = Math.max(0, Math.min(TeleStrip.W, TeleStrip.cutX(this, rpm) - TeleStrip.X0));
             int i0 = add(STRIP, TeleStrip.X0, TeleStrip.Y0, TeleStrip.W, TeleStrip.H, WHITE, true);
             size[i0] = 0;
             int i1 = add(STRIP, TeleStrip.X0, TeleStrip.Y0, clipW, TeleStrip.H, WHITE,
-                link && clipW > 0 && !(limit && !blink));
-            size[i1] = 1;
+                link && clipW > 0 && !(over && !blink));
+            size[i1] = over ? 2 : 1; // 2: the all-red lit picture from the shift point
         }
         for (int k = 0; k < 3 && !paintedStrip; k++) {
             double a = k == 0 ? 0 : k == 1 ? l0 : r0;
@@ -280,8 +281,8 @@ public final class TeleLayout {
         // only scaled to the exact rpm, rotated along the slopes. The whole lit part takes one
         // colour by rpm (cool white, warming to amber over the last 1500 rpm, red past the shift
         // point); at the limiter the fill only blinks. No new pictures per frame.
-        int fc = link && rpm >= redlineRpm ? RED : stripColourAt(rpm);
-        boolean fillOn = link && !(limit && !blink);
+        int fc = link && rpm >= shiftRpm ? RED : stripColourAt(rpm);
+        boolean fillOn = link && !(over && !blink);
         int pieces = 2 * SLOPE_PIECES + 1;
         // Two passes: every track first, then every fill, so no track covers a fill's overlap.
         for (int pass = 0; pass < 2 && !paintedStrip; pass++)
@@ -349,7 +350,7 @@ public final class TeleLayout {
             // vertical tick through the strip at each 1000 (user 2026-11-24: the one under 3 was missing)
             tp(rpmToS(k * 1000), pa);
             double hv = half(rpmToS(k * 1000)) / Math.max(0.5, -pa[3]);
-            boolean litT = link && rpm > k * 1000 && !(limit && !blink);
+            boolean litT = link && rpm > k * 1000 && !(over && !blink);
             box(rd(pa[0]) - 1, rd(pa[1] - hv), 2, rd(2 * hv), litT ? 0x0B0F1499 : LINE, true);
         }
         for (int k = (barFromRpm + 999) / 1000; k * 1000 <= barToRpm; k++) {
@@ -357,7 +358,7 @@ public final class TeleLayout {
                 continue;
             double sk0 = rpmToS(k * 1000);
             double th = 2 * half(sk0);
-            boolean litK = link && rpm > k * 1000 && !(limit && !blink);
+            boolean litK = link && rpm > k * 1000 && !(over && !blink);
             int nc = litK ? DARK_TEXT : k * 1000 >= redlineRpm ? RED : GREY;
             int sz = (int) Math.min(32, th - 10);
             // upright (user 2026-11-24), centred on the strip where its rpm is
@@ -376,7 +377,7 @@ public final class TeleLayout {
         quad(NOTCH_X1 - 1, LINE_Y, NOTCH_X1 + 1, LINE_Y, NOTCH_X1 - NOTCH_SLOPE + 1, NOTCH_Y,
             NOTCH_X1 - NOTCH_SLOPE - 1, NOTCH_Y, RED, true);
         box(NOTCH_X0 + NOTCH_SLOPE - 1, NOTCH_Y - 1, NOTCH_X1 - NOTCH_X0 - 2 * NOTCH_SLOPE + 2, 2, RED, true);
-        int gc = !link ? GREY : limit && !blink ? RED : WHITE;
+        int gc = !link ? GREY : over && !blink ? RED : WHITE;
         gearGlyph(720, 208 + D_Y, 104, gc);
 
         // Top-left pocket, along the rising slope: the active OpenHaldex preset, its mode above it,
@@ -509,7 +510,7 @@ public final class TeleLayout {
 
     /** The lit strip's one colour at this rpm, in four steps (few node colours on the car). */
     private int stripColourAt(int rpmNow) {
-        int from = redlineRpm - 1500;
+        int from = shiftRpm - 1500; // warm up to the shift point, red from there
         if (rpmNow <= from)
             return STRIP_LO;
         int step = Math.min(3, (rpmNow - from) * 4 / 1500);

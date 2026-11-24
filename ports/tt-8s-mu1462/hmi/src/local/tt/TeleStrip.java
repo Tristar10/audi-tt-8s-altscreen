@@ -23,6 +23,8 @@ public final class TeleStrip {
     /** ARGB, not premultiplied, W x H, row by row. */
     public final int[] track = new int[W * H];
     public final int[] lit = new int[W * H];
+    /** The lit strip all red (from the shift point on, user 2026-11-24). */
+    public final int[] litRed = new int[W * H];
     public long paintMs;
 
     private TeleStrip() {
@@ -125,7 +127,7 @@ public final class TeleStrip {
                 // Lit: cool white, warming to amber over the last 1500 rpm before the shift point,
                 // red past it; a soft tube shading across, darker ticks.
                 int rpm = t.sToRpm(bs);
-                int warm = t.redlineRpm - 1500;
+                int warm = t.shiftRpm - 1500;
                 int lc = x >= TeleLayout.TP_X[2] ? TeleLayout.RED
                     : rpm <= warm ? TeleLayout.STRIP_LO
                     : TeleLayout.mix(TeleLayout.STRIP_LO, TeleLayout.AMBER, (rpm - warm) / 1500f);
@@ -138,6 +140,8 @@ public final class TeleStrip {
                 lc = TeleLayout.mix(lc, TeleLayout.BG, (float) (0.12 * k * k));
                 lc = TeleLayout.mix(lc, TeleLayout.BG, (float) (tick * 0.5));
                 p.lit[py * W + px] = ((int) Math.round(litCov * 255) << 24) | (lc >>> 8);
+                int rc = TeleLayout.mix(TeleLayout.RED, TeleLayout.BG, (float) (0.12 * k * k + tick * 0.5));
+                p.litRed[py * W + px] = ((int) Math.round(litCov * 255) << 24) | (rc >>> 8);
             }
         }
         p.paintMs = System.currentTimeMillis() - t0;
