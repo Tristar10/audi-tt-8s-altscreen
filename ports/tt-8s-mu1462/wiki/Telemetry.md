@@ -157,6 +157,7 @@ path and the real firmware are not tested yet.
 | OpenHaldex-S3 `src/functions/telemetry/mmi_link.cpp` | Sender: runs from `loop()`, no task of its own; reads the decoded CAN values, sends, reads acks; stats in the app's Wi-Fi page (`/api/network`, `mmi`) |
 | OpenHaldex-S3 `docs/PRESETS.md`, `scripts/mmi_sim.py` | Preset spec; Python fake head unit for bench tests |
 | `gauges/scripts/gauge-send.py` | Laptop stand-in for OpenHaldex, with the same output; `--presets` also plays the preset side |
+| `hmi/src/local/tt/TeleStrip.java`, `gauges/tools/StripPreview.java` | tele8: the rev strip painted whole (track and lit pictures); PC preview of the clip cut |
 
 Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 
@@ -164,7 +165,42 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele7)
+## Autocross view on the head unit (tt-zoom tele8 probe)
+
+tele7 on the car (photo 2026-11-23, 6620 rpm): the strip still glitched. A black notch where each
+slope meets the flat middle (every piece is cut square to its own direction, so the cuts don't meet
+at a bend), a staircase at the partly filled piece (a stretched, turned plain box over a tapered
+track), and the 12 shift-light blocks read as a fence.
+
+How the view draws (all builds so far): EAL only places pictures and text. Every shape is a
+picture painted in Java once, then moved, scaled, turned or hidden per frame. The tele7 strip was
+21 pieces (dark track + lit picture each, plus a scaled box for the piece holding the rpm), about
+60 pictures.
+
+What the stock EAL also offers (found in the stock jar, 2026-11-24):
+- `IWrappedNode3D.setClippingRectangle(x, y, w, h)` with `setClippingInheritance(17)`,
+  `useClippingRectangle(true)`, `setClipping(true)` (the order ComboBoxRendererHigh and
+  MultilineTextFieldRendererHigh use). The rectangle is in the node's own coordinates; `clip()` adds
+  each ancestor's translation and scale (not rotation) and ends in the native `INode3D.clip`.
+- `IWrappedNode3DImage.setModulateColor(int)`: tint a picture (TitleBarRendererHigh, IconRendererHigh).
+- `createQuickDrawNode3D` / `IWrappedNode3DQuickDraw`: polyline with line width and colour (the
+  finger-trace screens).
+
+tele8 is a probe of the clip, not a new view. `sh tt.sh tele probe on` (or `img`) replaces the view
+with: the strip painted whole (TeleStrip: one continuous shape, round joins, soft edges, red zone,
+1000 rpm ticks, lit picture white to amber to red), the lit picture under a clip rectangle whose
+right edge is the rpm's x on the centre line, white marks above and below where the edge should be,
+and a readout of the clip's screen rectangle. Modes: `on`/`grp` clip on a group holding the picture,
+`img` clip on the picture itself. At the limiter the lit picture blinks (one visibility). The 10 s
+`tele stats` line carries the same readout. PC preview: `gauges/tools/StripPreview.java` ->
+`docs/strip-probe-preview.png`.
+
+Probe test (parked, map tab up): `sh tt.sh tele on`, `sh tt.sh tele demo on`, `sh tt.sh tele probe on`.
+Pass: the lit part ends at the white marks while the demo sweeps, no freeze at the top (limiter
+blink), frames/s in `grep tele /tmp/tt-rgd.log | tail` like tele7. If the whole strip stays dark or
+fully lit, try `sh tt.sh tele probe img`. Then `sh tt.sh tele probe off`.
+
+### Earlier: tele7
 
 tele5 photos and the tele6 preview: the slopes still showed seams and steps, the boost arc was
 stepped, in Sport the values ran under the rev counter's ring and the preset row sat under the stock

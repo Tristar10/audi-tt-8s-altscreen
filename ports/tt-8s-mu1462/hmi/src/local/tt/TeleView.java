@@ -35,6 +35,9 @@ import de.esolutions.hmi.widgets.audi.base.eal.TextureDescription;
  *   /tmp/tt-tele-demo    sweeping fake values, no OpenHaldex needed (the UDP port stays closed)
  *   /tmp/tt-tele-rot     tilted text and icons: -deg (default, right on the car), deg, rad, -rad, off
  *   /tmp/tt-tele-font    text size in percent of the layout's (default 70, see fontPct)
+ *   /tmp/tt-tele-probe   tele8 probe instead of the view: the painted rev strip (TeleStrip), the
+ *                        lit picture cut by a clip rectangle at the rpm. "grp" (default): the clip
+ *                        on a group holding the picture; "img": on the picture itself
  * Shows only while the map tab or the small view's map area is up. Playback "tele ..." lines:
  * apply N | info.
  *
@@ -49,6 +52,7 @@ public final class TeleView implements Runnable {
     private static final File DEMO_FILE = new File("/tmp/tt-tele-demo");
     private static final File ROT_FILE = new File("/tmp/tt-tele-rot");
     private static final File FONT_FILE = new File("/tmp/tt-tele-font");
+    private static final File PROBE_FILE = new File("/tmp/tt-tele-probe");
     /** Above the turn panel's 225, so the autocross view covers it. */
     private static final int VIEWPORT_INDEX = 228;
     private static final int SOLID = 8;
@@ -68,6 +72,11 @@ public final class TeleView implements Runnable {
      * /tmp/tt-tele-font holds a percentage to try others.
      */
     private static volatile int fontPct = 70;
+    /** -1 off, 0 clip on a group, 1 clip on the picture (PROBE_FILE). */
+    private static volatile int probeMode = -1;
+    private static volatile byte[] stripTrack;
+    private static volatile byte[] stripLit;
+    private static volatile String probeInfo = "-";
     private static volatile int rotGen;
     private static long lastPress;
     private static long jobs;
@@ -88,6 +97,13 @@ public final class TeleView implements Runnable {
     private static int builtKey = -1;
     private static int builtRotGen = -1;
     private static boolean shownVisible;
+    private static int pBuiltMode = -1;
+    private static IWrappedNode3D pClip;
+    private static IWrappedNode3DImage pLitImg;
+    private static IWrappedNode3D pMarkA;
+    private static IWrappedNode3D pMarkB;
+    private static IWrappedNode3DText pTxt;
+    private static int pScr0;
 
     private TeleView() {
     }
@@ -163,10 +179,14 @@ public final class TeleView implements Runnable {
                     } else {
                         TeleLink.snapshot(layout, now);
                     }
-                    boolean small = ZoomGate.small();
-                    layout.build(small ? TeleLayout.VIEW_SMALL : TeleLayout.VIEW_LARGE, TeleLayout.PAGE_LIVE);
-                    f = TeleFrame.of(layout, (small ? 1 : 0) | (rotGen << 4));
-                    prepareArt(f);
+                    if (probeMode >= 0) {
+                        f = probeFrame(layout, now);
+                    } else {
+                        boolean small = ZoomGate.small();
+                        layout.build(small ? TeleLayout.VIEW_SMALL : TeleLayout.VIEW_LARGE, TeleLayout.PAGE_LIVE);
+                        f = TeleFrame.of(layout, (small ? 1 : 0) | (rotGen << 4));
+                        prepareArt(f);
+                    }
                 } else {
                     f = TeleFrame.hidden();
                 }
@@ -191,6 +211,23 @@ public final class TeleView implements Runnable {
                 sleep(1000L);
             }
         }
+    }
+
+    /** tele8 probe frame; paints the strip pictures the first time (tick thread). */
+    private static TeleFrame probeFrame(TeleLayout layout, long now) {
+        if (stripLit == null) {
+            TeleStrip s = TeleStrip.paint(layout);
+            long t0 = System.currentTimeMillis();
+            stripTrack = argbToRgba(s.track, 255);
+            stripLit = argbToRgba(s.lit, 255);
+            RgdBus.note(new StringBuffer("tele probe: strip painted in ").append(s.paintMs).append(" ms, converted in ")
+                .append(System.currentTimeMillis() - t0).append(" ms, ").append(TeleStrip.W).append('x')
+                .append(TeleStrip.H).toString());
+        }
+        int rpm = layout.link && layout.has[TeleLayout.CH_RPM] ? (layout.val[TeleLayout.CH_RPM] + 500) / 1000 : 0;
+        boolean blink = (now / 100) % 2 == 0;
+        boolean lit = layout.link && !(rpm >= layout.limitRpm && !blink);
+        return TeleFrame.probe(probeMode, rpm, TeleStrip.cutX(layout, rpm), lit);
     }
 
     static void jobDone(long ms) {
@@ -229,7 +266,8 @@ public final class TeleView implements Runnable {
                 .append(statMs / Math.max(1L, statJobs)).append(" ms max ").append(statMax)
                 .append(" ms, changed slots avg ").append(statSlots / Math.max(1L, statJobs)).append(", pending ")
                 .append(pending ? (now - postedAt) / 1000 : 0).append(" s, lost jobs ").append(lostJobs).append(", art ")
-                .append(ART.size()).append(" | ").append(TeleLink.rxStats()).toString();
+                .append(ART.size()).append(probeMode >= 0 ? ", probe " : "").append(probeMode >= 0 ? probeInfo : "")
+                .append(" | ").append(TeleLink.rxStats()).toString();
             statJobs = 0;
             statMs = 0;
             statMax = 0;
@@ -373,8 +411,13 @@ public final class TeleView implements Runnable {
             note = new StringBuffer("viewport ").append(m.getScreenWidth()).append('x').append(m.getScreenHeight())
                 .toString();
         }
+        if (f.probe) {
+            String r = probeOnHmi(m, f);
+            return note == null ? r : r == null ? note : new StringBuffer(note).append(' ').append(r).toString();
+        }
         if (slots == null || f.key != builtKey || slots.length != f.count || builtRotGen != rotGen) {
             root.removeAllChildren();
+            pBuiltMode = -1;
             slots = new TeleSlot[f.count];
             for (int i = 0; i < f.count; i++) {
                 TeleSlot s = new TeleSlot();
@@ -421,6 +464,107 @@ public final class TeleView implements Runnable {
         m.fireRenderEvent();
         shownVisible = true;
         return note;
+    }
+
+    /**
+     * tele8 probe: background, the painted track, the painted lit strip under a clip rectangle whose
+     * right edge is the rpm, white marks where the edge should be, and a readout of what EAL made of
+     * the clip (its screen rectangle), so a photo tells whether the clip works and where it lands.
+     */
+    private static String probeOnHmi(EALManager m, TeleFrame f) {
+        String note = null;
+        if (pBuiltMode != f.pMode) {
+            root.removeAllChildren();
+            slots = null;
+            builtKey = -1;
+            IWrappedNode3D g = m.createNode3D(root, "ttTeleP", 0f, 0f);
+            IWrappedNode3DImage bg = picture(m, g, solid(TeleLayout.BG), SOLID, SOLID);
+            bg.setScale(TeleLayout.SCREEN_W / (float) SOLID, TeleLayout.SCREEN_H / (float) SOLID, 1f);
+            bg.setPosition(0f, 0f, 0f);
+            IWrappedNode3D gt = m.createNode3D(root, "ttTeleP", 0f, 0f);
+            IWrappedNode3DImage ti = picture(m, gt, stripTrack, TeleStrip.W, TeleStrip.H);
+            ti.setPosition(TeleStrip.X0, TeleStrip.Y0, 0f);
+            pClip = m.createNode3D(root, "ttTeleC", 0f, 0f);
+            pLitImg = picture(m, pClip, stripLit, TeleStrip.W, TeleStrip.H);
+            pLitImg.setPosition(TeleStrip.X0, TeleStrip.Y0, 0f);
+            IWrappedNode3D c = clipNode(f.pMode);
+            pScr0 = c.getScreenWidth();
+            if (pScr0 <= 0) {
+                c.setScreenSize(m.getScreenWidth(), m.getScreenHeight()); // crop() would leave nothing
+            }
+            // the stock order (ComboBoxRendererHigh, MultilineTextFieldRendererHigh)
+            c.setClippingInheritance(IWrappedNode3D.CLIPPING_TYPE_INHERIT_FROM_ANCESTOR
+                | IWrappedNode3D.CLIPPING_TYPE_INHERIT_TO_CHILDREN);
+            c.useClippingRectangle(true);
+            setClip(f);
+            c.setClipping(true);
+            pMarkA = mark(m);
+            pMarkB = mark(m);
+            IWrappedNode3D gx = m.createNode3D(root, "ttTeleP", 0f, 0f);
+            IWrappedFont font = font(2, 20);
+            pTxt = font == null ? null : m.createText3D(gx, "ttTeleT", "probe", font);
+            if (pTxt != null) {
+                pTxt.setColor(TeleLayout.WHITE);
+                pTxt.setPosition(40f, 360f, 0f);
+            }
+            pBuiltMode = f.pMode;
+            note = new StringBuffer("probe built, clip on ").append(f.pMode == 1 ? "picture" : "group")
+                .append(", node screen width before ").append(pScr0).toString();
+        }
+        setClip(f);
+        pClip.setVisible(f.pLit && f.pCut > TeleStrip.X0);
+        pMarkA.setPosition(f.pCut - 1, TeleStrip.Y0 - 14, 0f);
+        pMarkB.setPosition(f.pCut - 1, TeleStrip.Y0 + TeleStrip.H + 2, 0f);
+        IWrappedNode3D c = clipNode(f.pMode);
+        String info = new StringBuffer(f.pMode == 1 ? "img" : "grp").append(" rpm ").append(f.pRpm).append(" cut ")
+            .append(f.pCut).append(" | clip on screen x ").append((int) c.getScreenClippingX()).append(" y ")
+            .append((int) c.getScreenClippingY()).append(" w ").append((int) c.getScreenClippingWidth()).append(" h ")
+            .append((int) c.getScreenClippingHeight()).append(" | screen ").append(c.getScreenWidth()).append('x')
+            .append(c.getScreenHeight()).append(" (was ").append(pScr0).append(')').toString();
+        probeInfo = info;
+        if (pTxt != null) {
+            IWrappedFont font = font(2, 20);
+            if (font != null) {
+                pTxt.setText(new StringBuffer("PROBE ").append(info).toString(), font);
+            }
+        }
+        root.setVisible(true);
+        vp.setForceInvisible(false);
+        vp.setVisible(true);
+        m.fireRenderEvent();
+        shownVisible = true;
+        return note;
+    }
+
+    private static IWrappedNode3D clipNode(int mode) {
+        return mode == 1 ? (IWrappedNode3D) pLitImg : pClip;
+    }
+
+    /** The clip's right edge at the cut; the rectangle is in the clip node's own coordinates. */
+    private static void setClip(TeleFrame f) {
+        float w = Math.max(0, Math.min(TeleStrip.W, f.pCut - TeleStrip.X0));
+        if (f.pMode == 1) {
+            pLitImg.setClippingRectangle(0f, 0f, w, TeleStrip.H);
+        } else {
+            pClip.setClippingRectangle(TeleStrip.X0, TeleStrip.Y0, w, TeleStrip.H);
+        }
+    }
+
+    /** A 2 x 12 white mark in its own group (the group is moved). */
+    private static IWrappedNode3D mark(EALManager m) {
+        IWrappedNode3D g = m.createNode3D(root, "ttTeleP", 0f, 0f);
+        IWrappedNode3DImage img = picture(m, g, solid(TeleLayout.WHITE), SOLID, SOLID);
+        img.setScale(2f / SOLID, 12f / SOLID, 1f);
+        img.setPosition(0f, 0f, 0f);
+        return g;
+    }
+
+    private static IWrappedNode3DImage picture(EALManager m, IWrappedNode3D parent, byte[] px, int w, int h) {
+        ByteBuffer buf = ByteBuffer.allocateDirect(px.length);
+        buf.put(px);
+        buf.rewind();
+        TextureDescription d = m.createTextureDescription(buf, 6, w, h, null, new Object());
+        return m.createImage3D(parent, "ttTele", d, 0, true, "ttTele");
     }
 
     private static void image(EALManager m, TeleSlot s, TeleFrame f, int i) {
@@ -612,6 +756,8 @@ public final class TeleView implements Runnable {
     private static void readSwitches() {
         on = ON_FILE.exists() || (DEFAULT_ON.exists() && !OFF_FILE.exists());
         demo = DEMO_FILE.exists();
+        String pm = readLine(PROBE_FILE);
+        probeMode = pm == null ? -1 : pm.equals("img") ? 1 : 0;
         // Default -deg: on the car (tele1) +deg tilted the corner text against the slopes.
         String r = readLine(ROT_FILE);
         float scale = 1f;
@@ -667,7 +813,8 @@ public final class TeleView implements Runnable {
             return new StringBuffer("tele on=").append(on).append(" demo=").append(demo).append(" map=").append(mapNow)
                 .append(" visible=").append(shownVisible).append(" jobs=").append(jobs).append(" jobMax=")
                 .append(jobMsMax).append("ms art=").append(ART.size()).append(" rot=")
-                .append(rotOff ? 0f : rotSign * rotScale).append(' ').append(TeleLink.info()).toString();
+                .append(rotOff ? 0f : rotSign * rotScale).append(" probe=").append(probeMode).append(' ').append(probeInfo)
+                .append(' ').append(TeleLink.info()).toString();
         }
     }
 

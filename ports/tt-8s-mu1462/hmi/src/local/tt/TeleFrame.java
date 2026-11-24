@@ -22,6 +22,12 @@ final class TeleFrame {
     float[] rot;
     int[] qx;
     int[] qy;
+    /** tele8 probe: the painted strip with its lit picture cut at pCut (wiki Telemetry.md). */
+    boolean probe;
+    int pMode;
+    int pRpm;
+    int pCut;
+    boolean pLit;
 
     static TeleFrame hidden() {
         TeleFrame f = new TeleFrame();
@@ -56,10 +62,25 @@ final class TeleFrame {
         return f;
     }
 
+    static TeleFrame probe(int mode, int rpm, int cut, boolean lit) {
+        TeleFrame f = new TeleFrame();
+        f.show = true;
+        f.probe = true;
+        f.key = -2;
+        f.pMode = mode;
+        f.pRpm = rpm;
+        f.pCut = cut;
+        f.pLit = lit;
+        return f;
+    }
+
     /** Same picture as another frame (so nothing needs to be sent to the HMI thread). */
     boolean sameAs(TeleFrame o) {
-        if (o == null || o.show != show || o.key != key || o.count != count) {
+        if (o == null || o.show != show || o.key != key || o.count != count || o.probe != probe) {
             return false;
+        }
+        if (probe) {
+            return o.pMode == pMode && o.pRpm == pRpm && o.pCut == pCut && o.pLit == pLit;
         }
         if (!show) {
             return true;

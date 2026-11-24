@@ -115,10 +115,10 @@ public final class TeleLayout {
     // leaving a pocket above each slope. The flat middle is the fattest part and ends exactly at the
     // shift point; the slopes taper. The scale is in three parts: the left slope up to MID_RPM, the
     // middle up to the shift point, the right slope from the shift point to barToRpm.
-    private static final int[] TP_X = {24, 325, 1057, 1416};
-    private static final int[] TP_Y = {266, 152, 152, 266};
-    private static final int HALF_MIN = 15;
-    private static final int HALF_MAX = 27;
+    static final int[] TP_X = {24, 325, 1057, 1416};
+    static final int[] TP_Y = {266, 152, 152, 266};
+    static final int HALF_MIN = 15;
+    static final int HALF_MAX = 27;
     private static final int SLOPE_PIECES = 10;
     private static final int MID_RPM = 3000;
     // Shift lights: LEDS_SIDE per side under the tab bar, lighting from both ends towards the
@@ -499,7 +499,7 @@ public final class TeleLayout {
         return mix(STRIP_LO, AMBER, Math.min(1f, (rpmAt - from) / 1500f));
     }
 
-    private static int mix(int a, int b, float t) {
+    static int mix(int a, int b, float t) {
         int out = 0;
         for (int sh = 8; sh <= 24; sh += 8) {
             int ca = (a >>> sh) & 0xFF;
@@ -535,7 +535,7 @@ public final class TeleLayout {
     }
 
     /** Half the strip's thickness at length s: tapering on the slopes, full on the middle. */
-    private static double half(double s) {
+    static double half(double s) {
         double l0 = segLen(0);
         double l1 = segLen(1);
         double l2 = segLen(2);
@@ -546,7 +546,7 @@ public final class TeleLayout {
         return HALF_MAX - (HALF_MAX - HALF_MIN) * Math.min(1, (s - l0 - l1) / l2);
     }
 
-    private double rpmToS(int rpm) {
+    double rpmToS(int rpm) {
         double l0 = segLen(0);
         double l1 = segLen(1);
         double l2 = segLen(2);
@@ -557,7 +557,7 @@ public final class TeleLayout {
         return l0 + l1 + l2 * Math.min(1.0, (rpm - shiftRpm) / (double) (barToRpm - shiftRpm));
     }
 
-    private int sToRpm(double s) {
+    int sToRpm(double s) {
         double l0 = segLen(0);
         double l1 = segLen(1);
         double l2 = segLen(2);
@@ -588,7 +588,7 @@ public final class TeleLayout {
         rot[i] = (float) Math.toDegrees(Math.atan2(pa[2], -pa[3]));
     }
 
-    private static double segLen(int k) {
+    static double segLen(int k) {
         return Math.sqrt(sq(TP_X[k + 1] - TP_X[k]) + sq(TP_Y[k + 1] - TP_Y[k]));
     }
 
@@ -713,14 +713,14 @@ public final class TeleLayout {
 
     // Rev line geometry: length along the corner points -> point (o[0], o[1]) and outward normal
     // (o[2], o[3]), pointing up, away from the centre of the screen.
-    private static double tpLen() {
+    static double tpLen() {
         double l = 0;
         for (int i = 1; i < TP_X.length; i++)
             l += Math.sqrt(sq(TP_X[i] - TP_X[i - 1]) + sq(TP_Y[i] - TP_Y[i - 1]));
         return l;
     }
 
-    private static void tp(double s, double[] o) {
+    static void tp(double s, double[] o) {
         for (int i = 1; i < TP_X.length; i++) {
             double dx = TP_X[i] - TP_X[i - 1];
             double dy = TP_Y[i] - TP_Y[i - 1];
