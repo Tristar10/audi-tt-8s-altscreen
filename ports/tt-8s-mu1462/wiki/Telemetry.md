@@ -165,7 +165,21 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele8 probe)
+## Autocross view on the head unit (tt-zoom tele9)
+
+User 2026-11-24: make the UI more delicate, after screenshots of the stock cockpit. Reference: Audi's
+RS performance layout (a retrofit company's photo of a real cluster): a thin outlined rev band with
+the numbers beside it, 7 and 8 in red; Power and Torque as thin rings with a small red tick and light
+numerals; hairline dividers; red only as an accent. tele9 (also has the tele8 probe):
+- Rev strip 18..34 px (was 30..54), numbers 1..8 beside it in light weight (white once passed, red
+  from the red line). Painted strip (sim, probe): an outlined band, the fill inset inside a 1.5 px edge.
+- Shift lights 8 px slanted segments, no halo. No glow behind the gear; the notch is a red outline
+  whose dark fill flashes. Red line and notch edges 2 px.
+- Boost: 10 px coloured band between two hairline circles (TeleIcons RING); the turned cover is black.
+- Bars 4..6 px, values in the regular (not bold) font; gear glyph strokes 5.5 (were 8.5).
+Constants to go back: HALF_MIN/HALF_MAX in TeleLayout.
+
+### Earlier: tele8 probe
 
 tele7 on the car (photo 2026-11-23, 6620 rpm): the strip still glitched. A black notch where each
 slope meets the flat middle (every piece is cut square to its own direction, so the cuts don't meet
@@ -195,7 +209,7 @@ and a readout of the clip's screen rectangle. Modes: `on`/`grp` clip on a group 
 `tele stats` line carries the same readout. PC preview: `gauges/tools/StripPreview.java` ->
 `docs/strip-probe-preview.png`.
 
-PC simulator: separate private repo `audi-tt-8s-tele-sim` (`sh run.sh`, `--live` for UDP from
+PC simulator: repo [audi-tt-8s-MHI2-drawing-sim](https://github.com/Tristar10/audi-tt-8s-MHI2-drawing-sim) (`sh run.sh`, `--live` for UDP from
 `gauge-send.py` or OpenHaldex). It runs TeleLayout, TeleIcons, TeleStrip and TeleLink as they are
 here (copied with its `sync.sh`; this branch stays the source of truth) and draws the slots with
 AWT at the car's tick rate over the cockpit photos: demo or live data, painted or pieces strip,

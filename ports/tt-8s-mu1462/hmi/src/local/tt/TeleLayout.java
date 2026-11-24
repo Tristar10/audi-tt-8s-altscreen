@@ -81,9 +81,9 @@ public final class TeleLayout {
     public static final int GREEN = 0x34C759FF;
     public static final int AMBER = 0xFFB020FF;
     public static final int RED = 0xFF3B30FF;
-    public static final int NOTCH = 0x2E0806FF;
+    public static final int NOTCH = 0x110606FF;
     public static final int NOTCH_IN = 0x4A0E0AFF;
-    public static final int NOTCH_HOT = 0x7A160EFF;
+    public static final int NOTCH_HOT = 0x40100CFF;
     public static final int NOTCH_HOT_IN = 0xB8241AFF;
     public static final int LED_OFF = 0x1E242BFF;
     public static final int BLUE = 0x2F7BFFFF;
@@ -122,8 +122,10 @@ public final class TeleLayout {
     // middle up to the shift point, the right slope from the shift point to barToRpm.
     static final int[] TP_X = {24, 325, 1057, 1416};
     static final int[] TP_Y = {266, 152, 152, 266};
-    static final int HALF_MIN = 15;
-    static final int HALF_MAX = 27;
+    // Delicate pass (2026-11-24, after Audi's RS performance layout: a thin outlined band, numbers
+    // beside it): the strip is 18..34 px, it was 30..54.
+    static final int HALF_MIN = 9;
+    static final int HALF_MAX = 17;
     private static final int SLOPE_PIECES = 10;
     private static final int MID_RPM = 3000;
     // Shift lights: LEDS_SIDE per side under the tab bar, lighting from both ends towards the
@@ -222,13 +224,9 @@ public final class TeleLayout {
         double len = tpLen();
         double r0 = l0 + l1; // start of the right slope = the shift point
 
-        // Glow behind the gear: layered translucent red, brighter while the shift cue flashes.
+        // No glow behind the gear (delicate pass: its layers showed as steps); the notch's fill
+        // flashes with the shift lights instead.
         boolean hot = over && blink;
-        int[] gw = {170, 135, 100};
-        int[] ga = {hot ? 0x22 : 0x10, hot ? 0x30 : 0x18, hot ? 0x48 : 0x22};
-        for (int i = 0; i < gw.length; i++)
-            quad(720 - gw[i], 176, 720 + gw[i], 176, 720 + gw[i] - 40, 352, 720 - gw[i] + 40, 352,
-                (RED & 0xFFFFFF00) | ga[i], true);
 
         // Shift lights above the strip, as wide as its fat middle, slanted like the housing's slopes,
         // lighting from both ends towards the middle: green, blue, red over the last
@@ -236,11 +234,11 @@ public final class TeleLayout {
         int lx0 = TP_X[1];
         int lx1 = TP_X[2];
         int mid = 24;
-        int lgap = 8;
+        int lgap = 6;
         int lw = ((lx1 - lx0 - mid) / 2 - (LEDS_SIDE - 1) * lgap) / LEDS_SIDE;
-        int lh = 22;
-        int ly = 98;
-        int sk = 8;
+        int lh = 8;
+        int ly = 110;
+        int sk = 4;
         for (int side = 0; side < 2; side++) {
             for (int i = 0; i < LEDS_SIDE; i++) {
                 int on = shiftRpm - (LEDS_SIDE - i) * LED_STEP;
@@ -249,9 +247,6 @@ public final class TeleLayout {
                 int x0 = side == 0 ? lx0 + i * (lw + lgap) : lx1 - lw - i * (lw + lgap);
                 int x1 = x0 + lw;
                 int t = side == 0 ? sk : -sk; // top edge shifted: "/" on the left, "\" on the right
-                int g = 6;
-                quad(x0 + t - g, ly - g, x1 + t + g, ly - g, x1 + g, ly + lh + g, x0 - g, ly + lh + g,
-                    (c & 0xFFFFFF00) | 0x50, lit);
                 quad(x0 + t, ly, x1 + t, ly, x1, ly + lh, x0, ly + lh, c, true);
             }
         }
@@ -327,13 +322,13 @@ public final class TeleLayout {
             }
         }
         // Shift point: a red cut across the strip where the fat middle ends.
-        bandOff(r0 - 1.5, r0 + 1.5, -HALF_MAX - 7, HALF_MAX + 7, -HALF_MAX - 7, HALF_MAX + 7, RED, true);
+        bandOff(r0 - 1, r0 + 1, -HALF_MAX - 4, HALF_MAX + 4, -HALF_MAX - 4, HALF_MAX + 4, RED, true);
         // Limiter range: red marks along the outer edge of the right slope.
         double sl = rpmToS(limitRpm);
         for (int i = 0; i < 5; i++) {
             double a = sl + (len - sl) * i / 5;
             double b = sl + (len - sl) * (i + 1) / 5 - 3;
-            bandOff(a, b, half(a) + 5, half(a) + 10, half(b) + 5, half(b) + 10, RED, limitRpm < barToRpm);
+            bandOff(a, b, half(a) + 3, half(a) + 5, half(b) + 3, half(b) + 5, RED, limitRpm < barToRpm);
         }
         for (int k = (barFromRpm + 999) / 1000; k * 1000 <= barToRpm; k++) {
             if (k == 0)
@@ -341,35 +336,22 @@ public final class TeleLayout {
             double sk0 = rpmToS(k * 1000);
             double th = 2 * half(sk0);
             boolean litK = link && rpm > k * 1000 && !(limit && !blink);
-            int nc = litK ? DARK_TEXT : k * 1000 >= redlineRpm ? RED : GREY;
-            if (th >= 28) {
-                int sz = (int) Math.min(32, th - 10);
-                double at = k * 1000 >= barToRpm ? sk0 - 14 : sk0 + 0.5; // the last one just inside the end
-                slopeText(at, 0.46 * sz, sz, true, CENTER, nc, Integer.toString(k), true);
-            } else {
-                slopeText(sk0 - 6, -(half(sk0) + 6), 18, true, CENTER, k * 1000 >= redlineRpm ? RED : GREY,
-                    Integer.toString(k), true);
-            }
+            int nc = k * 1000 >= redlineRpm ? RED : litK ? WHITE : GREY;
+            double at = k * 1000 >= barToRpm ? sk0 - 8 : sk0;
+            slopeText(at, -(half(sk0) + 6), 20, false, CENTER, nc, Integer.toString(k), true);
         }
 
         // Red line across with a soft glow, and the notch holding the gear: two layers for depth,
         // flashing with the shift lights from the shift point.
-        quad(GRID_X0, LINE_Y - 6, NOTCH_X0 + 4, LINE_Y - 6, NOTCH_X0 + 4, LINE_Y + 6, GRID_X0, LINE_Y + 6,
-            (RED & 0xFFFFFF00) | 0x30, true);
-        quad(NOTCH_X1 - 4, LINE_Y - 6, GRID_X1, LINE_Y - 6, GRID_X1, LINE_Y + 6, NOTCH_X1 - 4, LINE_Y + 6,
-            (RED & 0xFFFFFF00) | 0x30, true);
-        int ni = 12;
         quad(NOTCH_X0, LINE_Y, NOTCH_X1, LINE_Y, NOTCH_X1 - NOTCH_SLOPE, NOTCH_Y, NOTCH_X0 + NOTCH_SLOPE, NOTCH_Y,
             hot ? NOTCH_HOT : NOTCH, true);
-        quad(NOTCH_X0 + ni + 4, LINE_Y + 2, NOTCH_X1 - ni - 4, LINE_Y + 2, NOTCH_X1 - NOTCH_SLOPE - ni,
-            NOTCH_Y - ni, NOTCH_X0 + NOTCH_SLOPE + ni, NOTCH_Y - ni, hot ? NOTCH_HOT_IN : NOTCH_IN, true);
-        box(GRID_X0, LINE_Y - 1, NOTCH_X0 - GRID_X0 + 2, 3, RED, true);
-        box(NOTCH_X1 - 2, LINE_Y - 1, GRID_X1 - NOTCH_X1 + 2, 3, RED, true);
-        quad(NOTCH_X0 - 1, LINE_Y, NOTCH_X0 + 2, LINE_Y, NOTCH_X0 + NOTCH_SLOPE + 2, NOTCH_Y,
+        box(GRID_X0, LINE_Y, NOTCH_X0 - GRID_X0 + 1, 2, RED, true);
+        box(NOTCH_X1 - 1, LINE_Y, GRID_X1 - NOTCH_X1 + 1, 2, RED, true);
+        quad(NOTCH_X0 - 1, LINE_Y, NOTCH_X0 + 1, LINE_Y, NOTCH_X0 + NOTCH_SLOPE + 1, NOTCH_Y,
             NOTCH_X0 + NOTCH_SLOPE - 1, NOTCH_Y, RED, true);
-        quad(NOTCH_X1 - 2, LINE_Y, NOTCH_X1 + 1, LINE_Y, NOTCH_X1 - NOTCH_SLOPE + 1, NOTCH_Y,
-            NOTCH_X1 - NOTCH_SLOPE - 2, NOTCH_Y, RED, true);
-        box(NOTCH_X0 + NOTCH_SLOPE - 1, NOTCH_Y - 1, NOTCH_X1 - NOTCH_X0 - 2 * NOTCH_SLOPE + 2, 3, RED, true);
+        quad(NOTCH_X1 - 1, LINE_Y, NOTCH_X1 + 1, LINE_Y, NOTCH_X1 - NOTCH_SLOPE + 1, NOTCH_Y,
+            NOTCH_X1 - NOTCH_SLOPE - 1, NOTCH_Y, RED, true);
+        box(NOTCH_X0 + NOTCH_SLOPE - 1, NOTCH_Y - 1, NOTCH_X1 - NOTCH_X0 - 2 * NOTCH_SLOPE + 2, 2, RED, true);
         int gc = !link ? GREY : limit && !blink ? RED : WHITE;
         gearGlyph(720, 208, 104, gc);
 
@@ -395,32 +377,32 @@ public final class TeleLayout {
             double a = ba + (bb - ba) * j / hs;
             double b = ba + (bb - ba) * (j + 1) / hs - 1.2;
             boolean on = link && act > 0 && j * 100 / hs < act;
-            bandOff(a, b, half(a) + 34, half(a) + 44, half(b) + 34, half(b) + 44, on ? HALDEX : TRACK, true);
+            bandOff(a, b, half(a) + 36, half(a) + 40, half(b) + 36, half(b) + 40, on ? HALDEX : DIM, true);
             double m = (a + b) / 2;
-            bandOff(m - 2, m + 2, half(m) + 30, half(m) + 48, half(m) + 30, half(m) + 48, WHITE,
+            bandOff(m - 1, m + 1, half(m) + 32, half(m) + 44, half(m) + 32, half(m) + 44, WHITE,
                 ok(CH_HX_TARGET) && j == ti);
         }
         slopeIcon(ba + 4, half(ba) + 56, 32, TeleIcons.AWD, ICONC, true);
-        slopeText(ba + 50, half(ba + 50) + 54 + 0.82 * 42, 42, true, LEFT, vc,
+        slopeText(ba + 50, half(ba + 50) + 54 + 0.82 * 40, 40, false, LEFT, vc,
             ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
 
         // Left of the notch: rpm, and the driver's inputs under it: accelerator (green) and brake
         // pressure (red, full bar at 100 bar).
         icon(GRID_X0 + 14, 210, 32, TeleIcons.TACH, ICONC, true);
-        text(NOTCH_X0 - 8, 202, 44, true, RIGHT, over ? RED : vc, ok(CH_RPM) ? Integer.toString(rpm) : "-", link);
+        text(NOTCH_X0 - 8, 204, 40, false, RIGHT, over ? RED : vc, ok(CH_RPM) ? Integer.toString(rpm) : "-", link);
         text(NOTCH_X0 - 8, 208, 34, true, RIGHT, AMBER, "NO LINK", !link);
         int ped = ok(CH_PEDAL) ? clamp(r(val[CH_PEDAL]), 0, 100) : 0;
         icon(GRID_X0 + 16, 254, 26, TeleIcons.PEDAL, ICONC, true);
-        bar(GRID_X0 + 54, 261, 126, 12, ped, 0, link ? PEDAL_FILL : GREY, -1);
-        text(NOTCH_X0 - 8, 255, 24, true, RIGHT, vc, ok(CH_PEDAL) ? percent(ped) : "-", true);
+        bar(GRID_X0 + 54, 265, 126, 4, ped, 0, link ? PEDAL_FILL : GREY, -1);
+        text(NOTCH_X0 - 8, 255, 24, false, RIGHT, vc, ok(CH_PEDAL) ? percent(ped) : "-", true);
         // Brake pressure smoothed (EMA at the 30 Hz tick) with a 2 bar dead band: the sensor reads
         // about 1 bar off the brakes (road test 2026-11-23).
         double rawBrake = ok(CH_BRAKE) ? Math.max(0, val[CH_BRAKE] / 1000.0) : 0;
         brakeSm += 0.3 * (rawBrake - brakeSm);
         int brk = brakeSm < 2.0 ? 0 : clamp((int) Math.round(brakeSm), 0, 999);
         icon(GRID_X0 + 16, 288, 26, TeleIcons.BRAKE, brk > 0 && link ? BRAKE_FILL : ICONC, true);
-        bar(GRID_X0 + 54, 295, 126, 12, Math.min(brk, 100), 0, link ? BRAKE_FILL : GREY, -1);
-        text(NOTCH_X0 - 8, 289, 24, true, RIGHT, vc, ok(CH_BRAKE) ? withUnit(brk, " bar") : "-", true);
+        bar(GRID_X0 + 54, 299, 126, 4, Math.min(brk, 100), 0, link ? BRAKE_FILL : GREY, -1);
+        text(NOTCH_X0 - 8, 289, 24, false, RIGHT, vc, ok(CH_BRAKE) ? withUnit(brk, " bar") : "-", true);
 
         // Right of the notch: boost as a turbo-style arc. Segments sweep from vacuum (steel blue)
         // through zero into boost, warming amber -> orange -> red, with a glow while on boost; a white
@@ -441,22 +423,25 @@ public final class TeleLayout {
             double a0 = 180 - 180.0 * i / segs + 0.5;
             double a1 = 180 - 180.0 * (i + 1) / segs - 0.5;
             int v = BOOST_MIN + (BOOST_MAX - BOOST_MIN) * (2 * i + 1) / (2 * segs);
-            arcSeg(acx, acy, 84, 112, a0, a1, v < 0 ? VAC_FILL : boostColour(v), true);
+            arcSeg(acx, acy, 98, 108, a0, a1, v < 0 ? VAC_FILL : boostColour(v), true);
         }
         double frac = link ? clamp(kpa - BOOST_MIN, 0, BOOST_MAX - BOOST_MIN) / (double) (BOOST_MAX - BOOST_MIN) : 0;
         double phi = 180 + 180 * frac; // clockwise screen degrees from the right, where the fill ends
         coverQuarter(acx, acy, phi);
         coverQuarter(acx, acy, phi + 90);
+        // the band's edges: hairline circles, their lower halves hidden with the cover's
+        icon(acx - 111, acy - 111, 222, TeleIcons.RING, LINE, true);
+        icon(acx - 95, acy - 95, 190, TeleIcons.RING, LINE, true);
         box(acx - 122, acy + 1, 244, 126, BG, true);
         double az = 180 - 180.0 * (0 - BOOST_MIN) / (BOOST_MAX - BOOST_MIN);
-        arcSeg(acx, acy, 78, 118, az + 0.8, az - 0.8, WHITE, true);
+        arcSeg(acx, acy, 92, 114, az + 0.5, az - 0.5, WHITE, true);
         // Peak marker: one fixed mark per segment, the one holding the peak shows.
         int pi = Math.min(segs - 1, (clamp(peakKpa, BOOST_MIN, BOOST_MAX) - BOOST_MIN) * segs / (BOOST_MAX - BOOST_MIN));
         for (int i = 0; i < segs; i++) {
             double am = 180 - 180.0 * (i + 0.5) / segs;
-            arcSeg(acx, acy, 108, 124, am + 1.2, am - 1.2, WHITE, link && peakKpa > 0 && i == pi);
+            arcSeg(acx, acy, 94, 116, am + 0.7, am - 0.7, WHITE, link && peakKpa > 0 && i == pi);
         }
-        text(acx, 250, 50, true, CENTER, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
+        text(acx, 250, 48, false, CENTER, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
         icon(acx - 42, 302, 22, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
         text(acx - 14, 304, 16, true, LEFT, GREY, boostPsi ? "PSI" : "BAR", true);
         text(acx - 100, 334, 14, true, CENTER, GREY, boostPsi ? "-14" : "-1", true);
@@ -467,7 +452,7 @@ public final class TeleLayout {
         for (int t = 0; t < T_CH.length; t++) {
             int cx0 = GRID_X0 + t * cw;
             if (t > 0)
-                box(cx0 - 1, GRID_Y + 2, 2, 28, LINE, true);
+                box(cx0, GRID_Y + 4, 1, 24, LINE, true);
             tempCell(t, cx0 + 12, cx0 + cw - 12, GRID_Y, 30, 32, rpm);
         }
     }
@@ -483,7 +468,7 @@ public final class TeleLayout {
 
     /** The boost arc's cover: a quarter ring in the track colour turned clockwise by deg. */
     private void coverQuarter(int cx, int cy, double deg) {
-        int i = add(ICON, cx, cy, 116, 116, TRACK, true);
+        int i = add(ICON, cx, cy, 116, 116, BG, true);
         size[i] = TeleIcons.ARCQ;
         rot[i] = (float) deg;
     }
@@ -526,7 +511,7 @@ public final class TeleLayout {
 
     /** Horizontal bar: track, fill from the from-percent to pct, optional tick at tickPct. */
     private void bar(int x0, int y0, int bw, int bh, int pct, int fromPct, int c, int tickPct) {
-        box(x0, y0, bw, bh, TRACK, true);
+        box(x0, y0, bw, bh, DIM, true);
         int a = Math.min(fromPct, pct);
         int b = Math.max(fromPct, pct);
         box(x0 + bw * a / 100, y0, bw * (b - a) / 100, bh, c, b > a);
@@ -635,12 +620,12 @@ public final class TeleLayout {
         int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
         int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
         icon(x0, 118, 28, TeleIcons.AWD, ICONC, true);
-        bar(x0 + 40, 124, 240, 16, act, 0, link ? HALDEX : GREY, -1);
-        box(x0 + 40 + 240 * tgt / 100 - 2, 119, 4, 26, WHITE, ok(CH_HX_TARGET));
-        text(x1, 116, 30, true, RIGHT, vc, ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
+        bar(x0 + 40, 129, 240, 6, act, 0, link ? HALDEX : GREY, -1);
+        box(x0 + 40 + 240 * tgt / 100 - 1, 124, 2, 16, WHITE, ok(CH_HX_TARGET));
+        text(x1, 116, 30, false, RIGHT, vc, ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
 
         // Preset and mode under the gear; Wi-Fi warning beside them while the link is slow or lost.
-        text(x0, 336, 26, true, LEFT, link ? PRESET : GREY, presetName(), true);
+        text(x0, 336, 26, false, LEFT, link ? PRESET : GREY, presetName(), true);
         text(x0 + 2, 364, 14, true, LEFT, GREY, presetMode(), true);
         boolean slow = link && rateHz >= 0 && rateHz < 10;
         icon(200, 340, 22, TeleIcons.WIFI, AMBER, !link || slow);
@@ -659,8 +644,8 @@ public final class TeleLayout {
         int zero = (0 - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN);
         int pos = clamp((kpa - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN), 0, 100);
         icon(x0, 396, 28, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
-        bar(x0 + 40, 402, 240, 18, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
-        text(x1 - 34, 394, 30, true, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
+        bar(x0 + 40, 408, 240, 6, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
+        text(x1 - 34, 394, 30, false, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
         text(x1, 406, 13, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
     }
 
@@ -680,7 +665,7 @@ public final class TeleLayout {
                 c = COLD;
         }
         icon(x0, yy, is, T_ICON[t], c == WHITE || c == GREY ? ICONC : c, true);
-        text(x1, yy + (is - vs) / 2, vs, true, RIGHT, c, v, true);
+        text(x1, yy + (is - vs) / 2, vs, false, RIGHT, c, v, true);
     }
 
     /** Haldex lock bar with target tick at (x0, y0); actual percent right-aligned at (rx, ry). */

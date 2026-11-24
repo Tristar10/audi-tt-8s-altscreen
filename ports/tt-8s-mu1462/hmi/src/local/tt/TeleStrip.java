@@ -107,11 +107,13 @@ public final class TeleStrip {
                 for (int k = 0; k < nt; k++) {
                     tick = Math.max(tick, clamp01(1.6 - Math.abs(bs - ticks[k])));
                 }
-                // Track: dark body (red zone past the redline), a lighter hairline along the edges,
-                // light ticks.
-                int tc = bs >= sRed ? TeleLayout.REDZONE : TeleLayout.TRACK;
-                tc = TeleLayout.mix(tc, TeleLayout.EDGE, (float) clamp01(2.0 - inside));
-                tc = TeleLayout.mix(tc, TeleLayout.LINE, (float) (tick * 0.8));
+                // Track: an outlined band (after Audi's RS performance layout): a near-black body and
+                // a 1.5 px hairline edge, red past the redline; faint ticks.
+                boolean red = bs >= sRed;
+                int tc = red ? 0x1A0706FF : 0x0B0E12FF;
+                int edge = red ? 0x8A2219FF : 0x56606BFF;
+                tc = TeleLayout.mix(tc, edge, (float) clamp01(2.0 - inside));
+                tc = TeleLayout.mix(tc, TeleLayout.LINE, (float) (tick * 0.6 * clamp01(inside - 1.5)));
                 p.track[py * W + px] = (a << 24) | (tc >>> 8);
                 // Lit: cool white, warming to amber over the last 1500 rpm before the shift point,
                 // red past it; a soft tube shading across, darker ticks.
@@ -120,10 +122,15 @@ public final class TeleStrip {
                 int lc = bs >= sShift ? TeleLayout.RED
                     : rpm <= warm ? TeleLayout.STRIP_LO
                     : TeleLayout.mix(TeleLayout.STRIP_LO, TeleLayout.AMBER, (rpm - warm) / 1500f);
+                // inset 2.5 px so the hairline edge stays around the fill
+                double litCov = clamp01(hw - 2.5 - perp + 0.5) * (over > 0 ? clamp01(0.5 - over - 2.5) : 1);
+                if (litCov <= 0) {
+                    continue;
+                }
                 double k = perp / hw;
-                lc = TeleLayout.mix(lc, TeleLayout.BG, (float) (0.22 * k * k));
-                lc = TeleLayout.mix(lc, TeleLayout.BG, (float) (tick * 0.45));
-                p.lit[py * W + px] = (a << 24) | (lc >>> 8);
+                lc = TeleLayout.mix(lc, TeleLayout.BG, (float) (0.12 * k * k));
+                lc = TeleLayout.mix(lc, TeleLayout.BG, (float) (tick * 0.5));
+                p.lit[py * W + px] = ((int) Math.round(litCov * 255) << 24) | (lc >>> 8);
             }
         }
         p.paintMs = System.currentTimeMillis() - t0;

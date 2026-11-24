@@ -24,7 +24,9 @@ public final class TeleIcons {
      * 83..116 px when drawn 116 px). Turned about that corner it hides a 90 degree stretch of the arc.
      */
     public static final int ARCQ = 11;
-    public static final int COUNT = 12;
+    /** A hairline circle filling the picture (line 1 % of the size): the boost arc's edges. */
+    public static final int RING = 12;
+    public static final int COUNT = 13;
 
     // Shape ops. CAP x0 y0 x1 y1 r (thick line, round ends) | CIRC x y r | RECT x0 y0 x1 y1 |
     // POLY n x0 y0 ... | CUT_CIRC x y r | CUT_RECT x0 y0 x1 y1 | CUT_POLY n x0 y0 ...
@@ -82,6 +84,8 @@ public final class TeleIcons {
             CAP, 50, 36, 50, 52, 4.5f, CIRC, 50, 63, 4.5f},
         // ARCQ: quarter ring about the top-left corner
         {CIRC, 0, 0, 100, CUT_CIRC, 0, 0, 71.5f},
+        // RING: hairline circle
+        {CIRC, 50, 50, 50, CUT_CIRC, 50, 50, 49},
     };
 
     /**
@@ -129,7 +133,7 @@ public final class TeleIcons {
                 ops[k * 6 + 2] = pts[k * 2 + 1];
                 ops[k * 6 + 3] = pts[k * 2 + 2];
                 ops[k * 6 + 4] = pts[k * 2 + 3];
-                ops[k * 6 + 5] = 8.5f;
+                ops[k * 6 + 5] = 5.5f; // light strokes, like the stock cockpit's numerals
             }
             GLYPHS[i] = ops;
         }
