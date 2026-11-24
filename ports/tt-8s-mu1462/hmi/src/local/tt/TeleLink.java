@@ -8,9 +8,13 @@ import java.net.InetAddress;
 /**
  * Head-unit end of the OpenHaldex link (wiki/Telemetry.md, same protocol as gauges/headunit/ttlink.c).
  *
- * Listens on UDP 49160 (the stock firewall passes 49153-49162 from hotspot clients) while the
- * autocross view is enabled, and closes the port when it is not, so ttlink can still be used for
- * link tests. Big-endian datagrams:
+ * Listens on one UDP port in 49153-49162 (the stock firewall passes that range from hotspot clients)
+ * while the autocross view is enabled, and closes it when it is not, so ttlink can still be used
+ * for link tests. CarPlay's AirPlay receiver binds ports in the same range (with wired CarPlay up,
+ * 49160 was taken, tele3), so the receiver takes the first free port from the top (PORTS);
+ * OpenHaldex (v1.1.19) sweeps the range with probes until a TTA1 answers and then keeps the port
+ * the answer came from. Acks and commands go out of the same socket, so their source port is it.
+ * Big-endian datagrams:
  *   TTG1 telemetry: "TTG1" key u32, seq u16, flags u8, count u8, count * (u16 id, s32 value*1000).
  *        Answered with TTA1: "TTA1" seq u16, 0 u16, rx u32, lost u32, uptime ms u32.
  *   TTP1 preset catalog: "TTP1" key u32, version u16, count u8, count * (id u8, mode u8, len u8, name).
@@ -21,7 +25,8 @@ import java.net.InetAddress;
  * Java 1.4 library only (HMI-patching.md): no string +, no generics, no autoboxing.
  */
 final class TeleLink implements Runnable {
-    static final int PORT = 49160;
+    /** Tried in this order: top first, away from the ports CarPlay fills from the bottom. */
+    static final int[] PORTS = {49162, 49161, 49160, 49159, 49158, 49157, 49156, 49155, 49154, 49153};
     static final int CHANNELS = TeleLayout.CHANNELS;
     /** A channel older than this is shown as no data. */
     static final long STALE_MS = 1500L;
@@ -59,6 +64,7 @@ final class TeleLink implements Runnable {
     private static long winAcks;
     private static long winBad;
     private static DatagramSocket sock;
+    private static int boundPort;
     private static final long T0 = System.currentTimeMillis();
 
     private TeleLink() {
@@ -99,10 +105,10 @@ final class TeleLink implements Runnable {
             }
             try {
                 if (s == null) {
-                    s = new DatagramSocket(PORT); // all interfaces: the hotspot is uap0, not loopback
+                    s = open(); // all interfaces: the hotspot is uap0, not loopback
                     s.setSoTimeout(500);
                     sock = s;
-                    RgdBus.note(new StringBuffer("tele rx listening udp ").append(PORT).toString());
+                    RgdBus.note(new StringBuffer("tele rx listening udp ").append(boundPort).toString());
                 }
                 p.setLength(buf.length);
                 s.receive(p);
@@ -240,6 +246,22 @@ final class TeleLink implements Runnable {
         }
     }
 
+    /** Binds the first free port of PORTS; throws the last error when every one is taken. */
+    private static DatagramSocket open() throws java.net.SocketException {
+        java.net.SocketException last = null;
+        for (int i = 0; i < PORTS.length; i++) {
+            try {
+                DatagramSocket d = new DatagramSocket(PORTS[i]);
+                boundPort = PORTS[i];
+                return d;
+            } catch (java.net.SocketException e) {
+                last = e;
+            }
+        }
+        boundPort = 0;
+        throw last;
+    }
+
     /** Asks OpenHaldex to apply a preset (TTC1, sent once; channel 22 confirms). */
     static String apply(int presetId) {
         InetAddress to;
@@ -332,7 +354,7 @@ final class TeleLink implements Runnable {
             return new StringBuffer("rx=").append(rx).append(" lost=").append(lost).append(" bad=").append(bad)
                 .append(" rate=").append(rateHz).append("Hz lastRx=")
                 .append(lastRx == 0 ? -1 : now - lastRx).append("ms catalog=").append(catN).append(" v=")
-                .append(catVer).append(" port=").append(sock == null ? "closed" : "open").append(' ')
+                .append(catVer).append(" port=").append(sock == null ? 0 : boundPort).append(' ')
                 .append(lastReply).toString();
         }
     }
@@ -348,7 +370,8 @@ final class TeleLink implements Runnable {
     static String rxStats() {
         long now = System.currentTimeMillis();
         synchronized (LOCK) {
-            String r = new StringBuffer("rx port ").append(sock == null ? (wanted ? "binding" : "closed") : "open")
+            String r = new StringBuffer("rx port ").append(sock == null ? (wanted ? "binding" : "closed")
+                : String.valueOf(boundPort))
                 .append(", 10 s: rx ").append(winRx).append(" acks ").append(winAcks).append(" bad ").append(winBad)
                 .append(", from ").append(lastFrom).append(", last ")
                 .append(lastRx == 0 ? -1 : (now - lastRx) / 1000).append(" s ago, bind errors ").append(errors)
