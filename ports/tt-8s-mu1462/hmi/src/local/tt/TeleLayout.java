@@ -41,6 +41,11 @@ public final class TeleLayout {
     public static final int TEXT = 1;
     public static final int QUAD = 2;
     public static final int ICON = 3;
+    /**
+     * The rev strip painted whole (TeleStrip): size 0 the track picture, size 1 the lit picture
+     * shown from x to x + w only (a clip rectangle on the car). Only when paintedStrip is set.
+     */
+    public static final int STRIP = 4;
     public static final int LEFT = 0;
     public static final int CENTER = 1;
     public static final int RIGHT = 2;
@@ -147,6 +152,8 @@ public final class TeleLayout {
     public boolean imperial = false;
     /** Boost in psi when true, bar when false. Channel 8 is taken as kPa above atmosphere. */
     public boolean boostPsi = false;
+    /** Draw the rev strip as TeleStrip's two pictures (STRIP slots) instead of pieces (tele8 probe). */
+    public boolean paintedStrip = false;
 
     // Input: latest values (x1000), whether each is fresh, link state, preset catalog.
     public final int[] val = new int[CHANNELS];
@@ -252,7 +259,15 @@ public final class TeleLayout {
         // Rev strip: a dark track with hairline edges; lit from cool white, warming to amber over the
         // last 1500 rpm before the shift point, all red past it, the whole strip flashing at the
         // limiter. Numbers sit inside the strip, dark on the lit part.
-        for (int k = 0; k < 3; k++) {
+        if (paintedStrip) {
+            int clipW = Math.max(0, Math.min(TeleStrip.W, TeleStrip.cutX(this, rpm) - TeleStrip.X0));
+            int i0 = add(STRIP, TeleStrip.X0, TeleStrip.Y0, TeleStrip.W, TeleStrip.H, WHITE, true);
+            size[i0] = 0;
+            int i1 = add(STRIP, TeleStrip.X0, TeleStrip.Y0, clipW, TeleStrip.H, WHITE,
+                link && clipW > 0 && !(limit && !blink));
+            size[i1] = 1;
+        }
+        for (int k = 0; k < 3 && !paintedStrip; k++) {
             double a = k == 0 ? 0 : k == 1 ? l0 : r0;
             double b = k == 0 ? l0 : k == 1 ? r0 : len;
             bandOff(a, b, half(a) + 1, half(a) + 3, half(b) + 1, half(b) + 3, EDGE, true);
@@ -267,7 +282,7 @@ public final class TeleLayout {
         boolean fillOn = link && !(limit && !blink);
         int pieces = 2 * SLOPE_PIECES + 1;
         // Two passes: every track first, then every fill, so no track covers a fill's overlap.
-        for (int pass = 0; pass < 2; pass++)
+        for (int pass = 0; pass < 2 && !paintedStrip; pass++)
         for (int k = 0; k < pieces; k++) {
             double s0;
             double s1;

@@ -195,6 +195,14 @@ and a readout of the clip's screen rectangle. Modes: `on`/`grp` clip on a group 
 `tele stats` line carries the same readout. PC preview: `gauges/tools/StripPreview.java` ->
 `docs/strip-probe-preview.png`.
 
+PC simulator: separate private repo `audi-tt-8s-tele-sim` (`sh run.sh`, `--live` for UDP from
+`gauge-send.py` or OpenHaldex). It runs TeleLayout, TeleIcons, TeleStrip and TeleLink as they are
+here (copied with its `sync.sh`; this branch stays the source of truth) and draws the slots with
+AWT at the car's tick rate over the cockpit photos: demo or live data, painted or pieces strip,
+glide between samples, 10/20/50 Hz data and 15-60 Hz ticks. For that, TeleLayout has a STRIP slot
+kind and `paintedStrip` (off on the car, so tt-zoom tele8 draws as before). Not simulated: the
+car's font size, EAL quirks, the head unit's speed.
+
 Probe test (parked, map tab up): `sh tt.sh tele on`, `sh tt.sh tele demo on`, `sh tt.sh tele probe on`.
 Pass: the lit part ends at the white marks while the demo sweeps, no freeze at the top (limiter
 blink), frames/s in `grep tele /tmp/tt-rgd.log | tail` like tele7. If the whole strip stays dark or
