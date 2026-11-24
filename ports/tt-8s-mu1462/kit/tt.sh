@@ -475,7 +475,7 @@ tele)
             slay -f ttlink 2>/dev/null; say 'Stopped ttlink (it held UDP 49160, which the view needs).'
         fi
     }
-    # OpenHaldex autocross view (tt-zoom tele11, wiki Telemetry.md): our own full-screen picture over
+    # OpenHaldex autocross view (tt-zoom tele12, wiki Telemetry.md): our own full-screen picture over
     # the map tab (Classic) or the small view's map area (Sport). RAM switches, read within 1 s;
     # "boot" writes the one flash default.
     case "${2:-}" in
@@ -500,6 +500,17 @@ tele)
         sounds) say 'Sound files on the head unit (also saved to /tmp/tt-sounds.txt):'
                 find /mnt /eso /fs -type f \( -name '*.wav' -o -name '*.WAV' -o -name '*.pcm' -o -name '*.mp3' -o -name '*.ogg' \) > /tmp/tt-sounds.txt 2>/dev/null
                 cat /tmp/tt-sounds.txt | head -60; say "$(wc -l < /tmp/tt-sounds.txt) files";;
+        keys) case "${3:-}" in
+               trace) touch /tmp/tt-tele-keys; say 'Key trace on: press the wheel buttons, then: grep "tele key" /tmp/tt-rgd.log | tail -30';;
+               notrace) rm -f /tmp/tt-tele-keys; say 'Key trace off.';;
+               toggle) case "${4:-}" in
+                         [0-9]*) echo "$4" > /tmp/tt-tele-key-code; say "Double press of key $4 now switches the view (until restart; flash: sh tt.sh tele keys save $4).";;
+                         *) say 'Usage: sh tt.sh tele keys toggle CODE'; exit 2;; esac;;
+               save) case "${4:-}" in
+                         [0-9]*) rw; echo "$4" > $K/tele-key-code; ro; echo "$4" > /tmp/tt-tele-key-code; say "Key $4 saved as the view toggle (every start).";;
+                         *) say 'Usage: sh tt.sh tele keys save CODE'; exit 2;; esac;;
+               off) rm -f /tmp/tt-tele-key-code; rw; rm -f $K/tele-key-code; ro; say 'No toggle key.';;
+               *) say 'Usage: sh tt.sh tele keys trace | notrace | toggle CODE | save CODE | off'; exit 2;; esac;;
         probe) case "${3:-on}" in
                on|grp) echo grp > /tmp/tt-tele-probe; say 'Strip probe on (clip on a group). For the sweep: sh tt.sh tele demo on';;
                img) echo img > /tmp/tt-tele-probe; say 'Strip probe on (clip on the picture). For the sweep: sh tt.sh tele demo on';;
@@ -509,7 +520,7 @@ tele)
                on) rw; touch $K/tele-on; ro; say 'Autocross view on at every MMI start.';;
                off) rw; rm -f $K/tele-on; ro; say 'Autocross view no longer on at start.';;
                *) say 'Usage: sh tt.sh tele boot on | off'; exit 2;; esac;;
-        *) say 'Usage: sh tt.sh tele on | off | demo on|off | beep N | shiftbeep N|off | sounds | probe on|img|off | rot deg|-deg|rad|-rad|off | boot on|off'
+        *) say 'Usage: sh tt.sh tele on | off | demo on|off | keys trace|toggle N|save N | beep N | shiftbeep N|off | sounds | probe on|img|off | rot deg|-deg|rad|-rad|off | boot on|off'
            say "   now: $(test -e /tmp/tt-tele-on && echo on || (test -e $K/tele-on && ! test -e /tmp/tt-tele-off && echo on || echo off)), demo $(test -e /tmp/tt-tele-demo && echo on || echo off), probe $(cat /tmp/tt-tele-probe 2>/dev/null || echo off), tilt $(cat /tmp/tt-tele-rot 2>/dev/null || echo -deg)"
            exit 2;;
     esac

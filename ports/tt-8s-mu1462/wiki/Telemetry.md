@@ -165,7 +165,22 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele11)
+## Autocross view on the head unit (tt-zoom tele12)
+
+Steering-wheel keys (2026-11-24): the HMI queues key events on its event dispatcher, which accepts
+filters (`HMIService.getEventDispatcherAdmin().addEventFilter`, `BaseJobFilter`; the stock
+driving-school display uses one). TeleKeys is such a filter: every event goes on to the stock
+handling first, unchanged; `KeyEvent`s (`getKeyCode`, `getID`: pressed 10401, released 10402, turned
+10403, long 10405) are only looked at. Known codes include INC_MENU_ENTER 17, INC_ROLLER_LEFT 20,
+INC_ROLLER_RIGHT 21, KEY_MENU 30, KEY_JOKER1 50; which ones the TT's wheel sends is to be traced.
+- `sh tt.sh tele keys trace`, press the wheel buttons, `grep "tele key" /tmp/tt-rgd.log | tail -30`.
+- `sh tt.sh tele keys toggle CODE` (RAM) / `keys save CODE` (flash): a double press of that key
+  within 450 ms switches the view. The stock action of the key still happens.
+- If the trace shows nothing for the wheel, its keys reach the HMI another way (the cluster's BAP
+  MFL path, `de.audi.app.combi.bap.app.mfl`) and that is the next place to look.
+
+### Earlier: tele11
+
 
 User 2026-11-24: the view started slowly, and switching Sport -> Classic was slow (Classic -> Sport
 fast). Cause: Classic is 273 slots with 161 quads (361 000 picture pixels, each tested at 16 sample

@@ -844,8 +844,8 @@ public final class TeleView implements Runnable {
     // ---------------------------------------------------------------- wheel, commands
 
     /**
-     * A scroll-wheel press. Two within 450 ms switch the autocross view on or off. Not wired yet:
-     * how the press reaches the HMI is still to be traced in the car.
+     * A press of the toggle key (TeleKeys, tele12). Two within 450 ms switch the autocross view on
+     * or off.
      */
     public static boolean press() {
         long now = System.currentTimeMillis();
@@ -881,6 +881,8 @@ public final class TeleView implements Runnable {
     private static void readSwitches() {
         on = ON_FILE.exists() || (DEFAULT_ON.exists() && !OFF_FILE.exists());
         demo = DEMO_FILE.exists();
+        TeleKeys.install();
+        TeleKeys.readSwitches();
         String bl = readLine(BEEP_FILE);
         if (bl != null) {
             BEEP_FILE.delete();
