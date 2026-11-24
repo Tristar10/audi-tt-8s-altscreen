@@ -164,7 +164,17 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele5)
+## Autocross view on the head unit (tt-zoom tele6)
+
+First road test (tele5 + OpenHaldex v1.1.19, 2026-11-23): mildly successful. Found: the screen froze
+on reaching the limiter (all 84 strip pieces changed colour on every flash, and the first time each
+needed new pictures); the brake read about 1 bar off the brakes; the stepped strip was not exact.
+tele6: the strip is 21 straight pieces (10 per slope, the flat middle one), each a dark track plus a
+fill box that is only scaled to the exact rpm (turned boxes on the slopes, `rot` on BOX slots); the lit
+part takes one colour by rpm (4 steps white to amber, red past the shift point); at the limiter only
+the fill blinks. Brake: EMA (0.3 per 30 Hz tick) with a 2 bar dead band.
+
+### Earlier: tele5
 
 The receiver's port. With wired CarPlay up, UDP 49160 was taken ("BindException ... 0.0.0.0:49160",
 `*.49160` in netstat, no ttlink running): CarPlay's AirPlay receiver binds ports in the same

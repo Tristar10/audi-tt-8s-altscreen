@@ -27,7 +27,7 @@ package local.tt;
  * once, one picture per colour they can take. The PC preview (gauges/tools/TelePreview.java)
  * draws the same slots with AWT.
  *
- * Coordinates are cockpit screen pixels (1440x540). A text slot's y is the top of the text; the
+ * Coordinates are cockpit screen pixels (1440x540). A turned BOX turns about (x, y), the middle of its start edge. A text slot's y is the top of the text; the
  * car places text by baseline at y + 0.82 * size. Colours are 0xRRGGBBAA, like EAL text colours.
  *
  * Java 1.4 library only (HMI-patching.md): no string +, no generics, no autoboxing.
@@ -119,7 +119,7 @@ public final class TeleLayout {
     private static final int[] TP_Y = {266, 152, 152, 266};
     private static final int HALF_MIN = 15;
     private static final int HALF_MAX = 27;
-    private static final int TP_SEGS = 84;
+    private static final int SLOPE_PIECES = 10;
     private static final int MID_RPM = 3000;
     // Shift lights: LEDS_SIDE per side under the tab bar, lighting from both ends towards the
     // middle, LED_STEP rpm apart up to the shift point.
@@ -188,6 +188,7 @@ public final class TeleLayout {
     private static final int BOOST_MIN = -100;
     private static final int BOOST_MAX = 150;
     private int peakKpa = BOOST_MIN;
+    private double brakeSm;
     private long peakAt;
     private final double[] pb = new double[4];
 
@@ -257,20 +258,48 @@ public final class TeleLayout {
             bandOff(a, b, half(a) + 1, half(a) + 3, half(b) + 1, half(b) + 3, EDGE, true);
             bandOff(a, b, -half(a) - 3, -half(a) - 1, -half(b) - 3, -half(b) - 1, EDGE, true);
         }
-        for (int i = 0; i < TP_SEGS; i++) {
-            double s0 = len * i / TP_SEGS;
-            double s1 = len * (i + 1) / TP_SEGS - 1.0;
-            int from = sToRpm(s0);
-            int c;
-            if (limit)
-                c = blink ? RED : from >= redlineRpm ? REDZONE : TRACK;
-            else if (rpm <= from || !link)
-                c = from >= redlineRpm ? REDZONE : TRACK;
-            else if (over)
-                c = RED;
-            else
-                c = stripColour(from);
-            bandOff(s0, s1, -half(s0), half(s0), -half(s1), half(s1), c, true);
+        // Continuous fill (tele6; the 84 coloured pieces were not exact and froze the car at the
+        // limiter): the strip is a few straight pieces, each a dark track and a fill box that is
+        // only scaled to the exact rpm, rotated along the slopes. The whole lit part takes one
+        // colour by rpm (cool white, warming to amber over the last 1500 rpm, red past the shift
+        // point); at the limiter the fill only blinks. No new pictures per frame.
+        int fc = over ? RED : stripColourAt(rpm);
+        boolean fillOn = link && !(limit && !blink);
+        int pieces = 2 * SLOPE_PIECES + 1;
+        for (int k = 0; k < pieces; k++) {
+            double s0;
+            double s1;
+            if (k < SLOPE_PIECES) {
+                s0 = l0 * k / SLOPE_PIECES;
+                s1 = l0 * (k + 1) / SLOPE_PIECES;
+            } else if (k == SLOPE_PIECES) {
+                s0 = l0;
+                s1 = r0;
+            } else {
+                int j = k - SLOPE_PIECES - 1;
+                s0 = r0 + (len - r0) * j / SLOPE_PIECES;
+                s1 = r0 + (len - r0) * (j + 1) / SLOPE_PIECES;
+            }
+            int p0 = sToRpm(s0);
+            int p1 = sToRpm(s1);
+            int track = p0 >= redlineRpm ? REDZONE : TRACK;
+            double frac = rpm <= p0 ? 0 : rpm >= p1 ? 1 : (rpm - p0) / (double) (p1 - p0);
+            if (k == SLOPE_PIECES) {
+                int y0 = TP_Y[1] - HALF_MAX;
+                int w0 = TP_X[2] - TP_X[1];
+                box(TP_X[1], y0, w0, 2 * HALF_MAX, track, true);
+                box(TP_X[1], y0, (int) Math.round(w0 * frac), 2 * HALF_MAX, fc, fillOn && frac > 0);
+            } else {
+                double th = 2 * half((s0 + s1) / 2);
+                double ext = k == SLOPE_PIECES - 1 || k == SLOPE_PIECES + 1 ? 4 : 2.5; // close the joints
+                double from = k == SLOPE_PIECES + 1 ? s0 - 3 : s0;
+                tp(from + 0.5, pa);
+                double ang = Math.toDegrees(Math.atan2(pa[2], -pa[3]));
+                tp(from, pa);
+                double full = s1 - from + ext;
+                rbox(pa[0], pa[1], full, th, ang, track, true);
+                rbox(pa[0], pa[1], frac >= 1 ? full : (s1 - from) * frac, th, ang, fc, fillOn && frac > 0);
+            }
         }
         // Shift point: a red cut across the strip where the fat middle ends.
         bandOff(r0 - 1.5, r0 + 1.5, -HALF_MAX - 7, HALF_MAX + 7, -HALF_MAX - 7, HALF_MAX + 7, RED, true);
@@ -359,7 +388,11 @@ public final class TeleLayout {
         icon(GRID_X0 + 16, 254, 26, TeleIcons.PEDAL, ICONC, true);
         bar(GRID_X0 + 54, 261, 126, 12, ped, 0, link ? PEDAL_FILL : GREY, -1);
         text(NOTCH_X0 - 8, 255, 24, true, RIGHT, vc, ok(CH_PEDAL) ? percent(ped) : "-", true);
-        int brk = ok(CH_BRAKE) ? clamp(r(val[CH_BRAKE]), 0, 999) : 0;
+        // Brake pressure smoothed (EMA at the 30 Hz tick) with a 2 bar dead band: the sensor reads
+        // about 1 bar off the brakes (road test 2026-11-23).
+        double rawBrake = ok(CH_BRAKE) ? Math.max(0, val[CH_BRAKE] / 1000.0) : 0;
+        brakeSm += 0.3 * (rawBrake - brakeSm);
+        int brk = brakeSm < 2.0 ? 0 : clamp((int) Math.round(brakeSm), 0, 999);
         icon(GRID_X0 + 16, 288, 26, TeleIcons.BRAKE, brk > 0 && link ? BRAKE_FILL : ICONC, true);
         bar(GRID_X0 + 54, 295, 126, 12, Math.min(brk, 100), 0, link ? BRAKE_FILL : GREY, -1);
         text(NOTCH_X0 - 8, 289, 24, true, RIGHT, vc, ok(CH_BRAKE) ? withUnit(brk, " bar") : "-", true);
@@ -426,6 +459,15 @@ public final class TeleLayout {
         quad(cx + rd(Math.cos(r0) * rOut), cy - rd(Math.sin(r0) * rOut), cx + rd(Math.cos(r1) * rOut),
             cy - rd(Math.sin(r1) * rOut), cx + rd(Math.cos(r1) * rIn), cy - rd(Math.sin(r1) * rIn),
             cx + rd(Math.cos(r0) * rIn), cy - rd(Math.sin(r0) * rIn), c, v);
+    }
+
+    /** The lit strip's one colour at this rpm, in four steps (few node colours on the car). */
+    private int stripColourAt(int rpmNow) {
+        int from = shiftRpm - 1500;
+        if (rpmNow <= from)
+            return STRIP_LO;
+        int step = Math.min(3, (rpmNow - from) * 4 / 1500);
+        return mix(STRIP_LO, AMBER, step / 3f);
     }
 
     /** Lit strip colour at rpm: cool white, warming to amber over the last 1500 rpm before shift. */
@@ -777,6 +819,12 @@ public final class TeleLayout {
 
     private void box(int x0, int y0, int w0, int h0, int c, boolean v) {
         add(BOX, x0, y0, w0, h0, c, v);
+    }
+
+    /** A box turned by ang degrees about (x0, y0), the middle of its start edge; w along the turn. */
+    private void rbox(double x0, double y0, double w0, double h0, double ang, int c, boolean v) {
+        int i = add(BOX, rd(x0), rd(y0), (int) Math.round(w0), (int) Math.round(h0), c, v && w0 >= 0.5);
+        rot[i] = (float) ang;
     }
 
     /** The gear as one sharp glyph (TeleIcons), centred at cx, top at y0, gh high. */

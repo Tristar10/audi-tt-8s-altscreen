@@ -155,7 +155,8 @@ public class TelePreview {
     }
 
     private static void draw(Graphics2D g, TeleLayout t, int view, int page) {
-        t.build(view, page);
+        for (int k = 0; k < 30; k++) // let the smoothing (brake) settle, as at 30 Hz in the car
+            t.build(view, page);
         for (int i = 0; i < t.count; i++) {
             if (!t.vis[i])
                 continue;
@@ -164,7 +165,9 @@ public class TelePreview {
             if (t.rot[i] != 0)
                 g.rotate(Math.toRadians(t.rot[i]), t.x[i], t.y[i]);
             g.setColor(new Color((c >>> 24) & 0xFF, (c >>> 16) & 0xFF, (c >>> 8) & 0xFF, c & 0xFF));
-            if (t.kind[i] == TeleLayout.BOX) {
+            if (t.kind[i] == TeleLayout.BOX && t.rot[i] != 0) {
+                g.fillRect(t.x[i], t.y[i] - t.h[i] / 2, t.w[i], t.h[i]); // already turned about (x, y)
+            } else if (t.kind[i] == TeleLayout.BOX) {
                 g.fillRect(t.x[i], t.y[i], t.w[i], t.h[i]);
             } else if (t.kind[i] == TeleLayout.QUAD) {
                 int[] xs = new int[4];

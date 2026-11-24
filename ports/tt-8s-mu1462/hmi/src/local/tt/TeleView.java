@@ -459,16 +459,19 @@ public final class TeleView implements Runnable {
         if (img == null) {
             return;
         }
-        float rot = f.kind[i] == TeleLayout.ICON && !rotOff ? f.rot[i] : 0f;
+        // Icons tilt only when rotation is on; turned boxes (rev strip pieces) always turn.
+        boolean box = f.kind[i] == TeleLayout.BOX;
+        float rot = box || (f.kind[i] == TeleLayout.ICON && !rotOff) ? f.rot[i] : 0f;
         if (f.x[i] != s.sx || f.y[i] != s.sy || f.w[i] != s.sw || f.h[i] != s.sh || rot != s.shownRot) {
             float uw = img.getUnscaledWidth();
             float uh = img.getUnscaledHeight();
             img.setScale(f.w[i] / (uw > 0 ? uw : 1f), f.h[i] / (uh > 0 ? uh : 1f), 1f);
             if (rot != 0f) {
-                // turn a group about the icon's top-left corner, whatever the node's own pivot is
+                // turn a group about the anchor (an icon's top-left corner, a box's start-edge
+                // middle), whatever the node's own pivot is
                 s.group.setPosition(f.x[i], f.y[i], 0f);
                 s.group.setRotationZ(rot * rotSign * rotScale);
-                img.setPosition(0f, 0f, 0f);
+                img.setPosition(0f, box ? -f.h[i] / 2f : 0f, 0f);
             } else {
                 img.setPosition(f.x[i], f.y[i], 0f);
             }
