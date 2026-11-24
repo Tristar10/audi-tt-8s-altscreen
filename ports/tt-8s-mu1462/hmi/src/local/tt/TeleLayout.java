@@ -232,8 +232,10 @@ public final class TeleLayout {
         // Shift lights above the strip, as wide as its fat middle, slanted like the housing's slopes,
         // lighting from both ends towards the middle: green, blue, red over the last
         // LEDS_SIDE * LED_STEP rpm. From the shift point all flash red. Lit lights glow.
-        int lx0 = TP_X[1];
-        int lx1 = TP_X[2];
+        // Centred on the screen (x 720) like the gear and the tab bar, not on the strip's middle
+        // (which follows the frame and sits left of centre); kept over the flat part.
+        int lx0 = 720 - 330;
+        int lx1 = 720 + 330;
         int mid = 24;
         int lgap = 6;
         int lw = ((lx1 - lx0 - mid) / 2 - (LEDS_SIDE - 1) * lgap) / LEDS_SIDE;
