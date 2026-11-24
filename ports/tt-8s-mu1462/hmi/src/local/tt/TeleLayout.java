@@ -48,6 +48,20 @@ public final class TeleLayout {
      * shown from x to x + w only (a clip rectangle on the car). Only when paintedStrip is set.
      */
     public static final int STRIP = 4;
+    /**
+     * The car picture on the Haldex page (tele20): size CAR_UP (Sport, nose up) or CAR_SIDE
+     * (Classic, nose right); x, y, w, h its place. Only when carArt is set.
+     */
+    public static final int IMAGE = 5;
+    public static final int CAR_UP = 0;
+    public static final int CAR_SIDE = 1;
+    /** Picture sizes on the screen (the files on the car are exactly these). */
+    public static final int CAR_UP_W = 146;
+    public static final int CAR_UP_H = 300;
+    public static final int CAR_SIDE_W = 384;
+    public static final int CAR_SIDE_H = 186;
+    /** The car pictures are on the head unit (TeleView sets it): the page draws the livery. */
+    public boolean carArt;
     public static final int LEFT = 0;
     public static final int CENTER = 1;
     public static final int RIGHT = 2;
@@ -463,7 +477,7 @@ public final class TeleLayout {
 
         if (hxPage) {
             // car sideways, nose to the right; gauge and stats to its right; the gear small in the corner
-            drivetrain(340, 232, 400, 196, true);
+            drivetrain(344, 230, 400, 196, true);
             lockRing(860, 316, 62, 16);
             hxStats(944, 238, 1100);
             gearGlyph(1082, 236, 44, gc);
@@ -828,99 +842,109 @@ public final class TeleLayout {
         boolean off = modeNow == 0;
         double steer = ok(CH_STEER) ? val[CH_STEER] / 1000.0 : 0;
         double road = Math.max(-35, Math.min(35, steer / 15.0)); // road-wheel angle, deg
-        // car geometry along its length L (0 nose .. 1 tail) and across W (-0.5 .. 0.5)
-        double len = side ? bw - 30 : bh - 24;
-        double wid = len * 0.44;
-        double cxa = side ? bx + bw / 2.0 : bx + bw / 2.0; // centre
-        double cya = side ? by + bh / 2.0 : by + bh / 2.0;
-        // body: a rounded outline from boxes (front, cabin, tail), dark with a hairline edge
-        bodyBox(-0.50, -0.46, 0.50, 0.46, cxa, cya, len, wid, side, 0x0B1430FF);
-        bodyBox(-0.12, -0.34, 0.20, 0.34, cxa, cya, len, wid, side, 0x13204AFF); // cabin glass
-        // axle positions (TT 8S: wheelbase 0.60 of the length, front axle at 0.22)
-        double fy = -0.28;
-        double ry = 0.32;
-        double cpl = ry - 0.07;
+        // the car's picture box: length along the car L, width W (the app's 660 x 1360 aspect)
+        int pw = side ? CAR_SIDE_W : CAR_UP_W;
+        int ph = side ? CAR_SIDE_H : CAR_UP_H;
+        int px = bx + (bw - pw) / 2;
+        int py = by + (bh - ph) / 2;
+        double cL = side ? pw : ph;
+        double cW = side ? ph : pw;
+        carBox[0] = px;
+        carBox[1] = py;
+        carBox[2] = pw;
+        carBox[3] = ph;
+        carSide = side;
+        carL = cL;
+        carW = cW;
+        if (carArt) {
+            int i = add(IMAGE, px, py, pw, ph, WHITE, true);
+            size[i] = side ? CAR_SIDE : CAR_UP;
+        } else {
+            car(0.08, 0.02, 0.92, 0.98, 0x0B1430FF);
+            car(0.20, 0.33, 0.80, 0.47, 0x13204AFF);
+        }
+        double cx = 0.495;
+        double fy = 0.232;
+        double ry = 0.788;
+        double cpl = ry - 0.045;
         int rc = !link ? 0x5A6270FF : rearColour(act);
         int fc = !link ? 0x6B7385FF : off ? 0xB4BECCFF : HX_ICE;
-        // axles and prop shaft
-        line(fy, -0.40, fy, 0.40, 4, fc, cxa, cya, len, wid, side);
-        line(fy, 0, cpl, 0, 4, act > 0 && link ? rc : 0x3A424BFF, cxa, cya, len, wid, side);
-        line(ry, -0.40, ry, 0.40, 4, rc, cxa, cya, len, wid, side);
-        // torque dashes moving rearward, faster with more lock (fixed set, positions move)
-        int nd = 5;
-        double speed = 0.25 + 0.75 * act / 100.0; // shaft lengths per second
-        double ph = (now % 100000L) / 1000.0 * speed;
+        // axles and prop shaft, dark under-strokes keep them readable over the livery
+        seg(cx - 0.359, fy, cx + 0.359, fy, 4, fc);
+        seg(cx, fy, cx, cpl, 3, act > 0 && link ? rc : 0x6A7280FF);
+        seg(cx - 0.353, ry, cx + 0.353, ry, 4, rc);
+        // torque dashes travelling rearward, faster with more lock
+        int nd = 6;
+        double speed = 0.4 + 1.2 * act / 100.0;
+        double ph0 = (now % 100000L) / 1000.0 * speed;
         for (int k = 0; k < nd; k++) {
-            double f = ((ph + k / (double) nd) % 1.0);
-            double a = fy + (cpl - fy) * f;
-            dash(a, cxa, cya, len, wid, side, link && act > 0 && !off);
+            double f = (ph0 + k / (double) nd) % 1.0;
+            int[] d = cpt(cx, fy + (cpl - fy) * f);
+            box(d[0] - 2, d[1] - 2, 4, 4, WHITE, link && act > 0 && !off);
         }
-        // coupling: a box with a fill proportional to the lock
-        int[] c = pt(cpl, 0, cxa, cya, len, wid, side);
-        box(c[0] - 15, c[1] - 11, 30, 22, rc, true);
-        box(c[0] - 13, c[1] - 9, 26, 18, HX_NAVY, true);
-        box(c[0] - 11, c[1] - 7, 22 * act / 100, 14, HX_CYAN, link && act > 0);
-        // wheels: front turned with the steering, rear lit with the lock
-        double tl = 0.13 * len;
-        double tw = 0.07 * len;
-        wheel(fy, -0.43, road, tl, tw, fc, cxa, cya, len, wid, side);
-        wheel(fy, 0.43, road, tl, tw, fc, cxa, cya, len, wid, side);
-        wheel(ry, -0.43, 0, tl, tw, rc, cxa, cya, len, wid, side);
-        wheel(ry, 0.43, 0, tl, tw, rc, cxa, cya, len, wid, side);
-        // split tags at the axles, and the state tag
-        text(c[0], c[1] + (side ? 16 : 14), 14, true, CENTER, HX_ICE, percent(act), link && act > 0 && side);
+        // coupling: a box filling with the lock
+        int[] c = cpt(cx, cpl);
+        box(c[0] - 13, c[1] - 10, 26, 20, rc, true);
+        box(c[0] - 11, c[1] - 8, 22, 16, HX_NAVY, true);
+        box(c[0] - 9, c[1] - 6, 18 * act / 100, 12, HX_CYAN, link && act > 0);
+        // tyres (0.105 x 0.140 of the picture): front turned with the steering
+        double tl = 0.140 * cL;
+        double tw = 0.105 * cW;
+        tyre(cx - 0.359, fy, road, tl, tw, fc);
+        tyre(cx + 0.359, fy, road, tl, tw, fc);
+        tyre(cx - 0.353, ry, 0, tl, tw, rc);
+        tyre(cx + 0.353, ry, 0, tl, tw, rc);
+        // lock tag behind the rear axle, and the state tag
+        int[] t = cpt(cx, ry + 0.07);
+        text(t[0], t[1] - 9, 14, true, CENTER, HX_ICE, percent(act), link && act > 0);
         String tag = !link ? "NOT CONNECTED" : off ? "STOCK CONTROL" : null;
         text(side ? bx + 8 : bx + bw / 2, side ? by + 2 : by + bh - 16, 13, true, side ? LEFT : CENTER,
             !link ? HX_PINK : HX_ICE, tag, tag != null);
     }
 
-    /** A point at (l along, w across) of the car, in screen px. */
-    private static int[] pt(double l, double w, double cx, double cy, double len, double wid, boolean side) {
-        double a = l * len;
-        double b = w * wid;
-        // side: nose right, so along = -x; upright: nose up, along = +y
-        return side ? new int[] {(int) Math.round(cx - a), (int) Math.round(cy + b)}
-            : new int[] {(int) Math.round(cx + b), (int) Math.round(cy + a)};
+    private final int[] carBox = new int[4];
+    private boolean carSide;
+    private double carL;
+    private double carW;
+
+    /** A point given as fractions of the upright car picture (u across, v from the nose). */
+    private int[] cpt(double u, double v) {
+        if (carSide) // nose right: along the car = -x, the car's left side up
+            return new int[] {rd(carBox[0] + carBox[2] - v * carL), rd(carBox[1] + u * carW)};
+        return new int[] {rd(carBox[0] + u * carW), rd(carBox[1] + v * carL)};
     }
 
-    private void bodyBox(double l0, double w0, double l1, double w1, double cx, double cy, double len, double wid,
-                         boolean side, int c) {
-        int[] p = pt(l0, w0, cx, cy, len, wid, side);
-        int[] q = pt(l1, w1, cx, cy, len, wid, side);
+    private void car(double u0, double v0, double u1, double v1, int c) {
+        int[] p = cpt(u0, v0);
+        int[] q = cpt(u1, v1);
         int x = Math.min(p[0], q[0]);
         int y = Math.min(p[1], q[1]);
         box(x - 1, y - 1, Math.abs(q[0] - p[0]) + 2, Math.abs(q[1] - p[1]) + 2, 0x2C3A52FF, true);
         box(x, y, Math.abs(q[0] - p[0]), Math.abs(q[1] - p[1]), c, true);
     }
 
-    private void line(double l0, double w0, double l1, double w1, int t, int c, double cx, double cy, double len,
-                      double wid, boolean side) {
-        int[] p = pt(l0, w0, cx, cy, len, wid, side);
-        int[] q = pt(l1, w1, cx, cy, len, wid, side);
-        thick(p[0], p[1], q[0], q[1], t + 4, 0x0000008C, true); // dark under-stroke
+    private void seg(double u0, double v0, double u1, double v1, int t, int c) {
+        int[] p = cpt(u0, v0);
+        int[] q = cpt(u1, v1);
+        thick(p[0], p[1], q[0], q[1], t + 4, 0x0000008C, true);
         thick(p[0], p[1], q[0], q[1], t, c, true);
     }
 
-    private void dash(double l, double cx, double cy, double len, double wid, boolean side, boolean v) {
-        int[] p = pt(l, 0, cx, cy, len, wid, side);
-        if (side)
-            box(p[0] - 3, p[1] - 1, 6, 3, WHITE, v);
-        else
-            box(p[0] - 1, p[1] - 3, 3, 6, WHITE, v);
-    }
-
-    /** A tyre centred at (l, w), turned by deg (clockwise seen from above). */
-    private void wheel(double l, double w, double deg, double tl, double tw, int c, double cx, double cy, double len,
-                       double wid, boolean side) {
-        int[] p = pt(l, w, cx, cy, len, wid, side);
-        // a turned box turns about the middle of its start edge: start half a tyre back along it
-        double ang = side ? deg : deg - 90; // side: the tyre runs along x (0 deg); upright: along y
+    /** A tyre centred at (u, v), turned by deg (clockwise seen from above). */
+    private void tyre(double u, double v, double deg, double tl, double tw, int c) {
+        int[] p = cpt(u, v);
+        double ang = carSide ? deg : deg - 90; // the tyre runs along the car
         double rad = Math.toRadians(ang);
         double sx = p[0] - Math.cos(rad) * tl / 2;
         double sy = p[1] - Math.sin(rad) * tl / 2;
         rbox(sx, sy, tl, tw + 4, ang, c, true);
-        rbox(sx + Math.cos(rad) * 2, sy + Math.sin(rad) * 2, tl - 4, tw, ang, HX_NAVY, true);
+        rbox(sx + Math.cos(rad) * 2, sy + Math.sin(rad) * 2, tl - 4, tw, ang, 0x05091CB8, true);
     }
+
+
+
+
+
 
     /** The lock ring: 270 degrees open at the bottom, 30 segments, the target as a pink dot. */
     private void lockRing(int cx, int cy, int r, int thick) {

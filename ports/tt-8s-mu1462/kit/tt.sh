@@ -484,7 +484,7 @@ tele)
             slay -f ttlink 2>/dev/null; say 'Stopped ttlink (it held UDP 49160, which the view needs).'
         fi
     }
-    # OpenHaldex autocross view (tt-zoom tele19, wiki Telemetry.md): our own full-screen picture over
+    # OpenHaldex autocross view (tt-zoom tele20, wiki Telemetry.md): our own full-screen picture over
     # the map tab (Classic) or the small view's map area (Sport). RAM switches, read within 1 s;
     # "boot" writes the one flash default.
     case "${2:-}" in
@@ -522,6 +522,9 @@ tele)
                off) rm -f /tmp/tt-tele-glide; if test -f $K/tele-glide; then rw; rm -f $K/tele-glide; ro; fi; say 'Glide off.';;
                boot) rw; touch $K/tele-glide; ro; say 'Glide on at every start.';;
                *) say 'Usage: sh tt.sh tele glide on | off | boot'; exit 2;; esac;;
+        car) for v in up side; do
+               if test -f /tmp/hx-car-$v.rgba; then rw; cp /tmp/hx-car-$v.rgba $K/hx-car-$v.rgba; ro; say "Installed hx-car-$v.rgba."; fi
+             done; say 'Haldex page car pictures: restart the MMI to load them.';;
         theme) case "${3:-}" in
                on) if test -f $K/theme-classic.rgba -o -f $K/theme-sport.rgba; then touch /tmp/tt-tele-theme; say 'Theme on (within 1 s).'
                    else say "No theme pictures in $K: copy theme-classic.rgba and theme-sport.rgba there first."; exit 1; fi;;
@@ -594,7 +597,7 @@ tele)
                on) rw; touch $K/tele-on; ro; say 'Autocross view on at every MMI start.';;
                off) rw; rm -f $K/tele-on; ro; say 'Autocross view no longer on at start.';;
                *) say 'Usage: sh tt.sh tele boot on | off'; exit 2;; esac;;
-        *) say 'Usage: sh tt.sh tele on | off | demo on|off | ui open|up|down|press|back|page | glide on|off|boot | theme on|off|boot|install | selftest | keys trace|toggle N|save N | beep N | shiftbeep N|off | sounds | probe on|img|off | rot deg|-deg|rad|-rad|off | boot on|off'
+        *) say 'Usage: sh tt.sh tele on | off | demo on|off | ui open|up|down|press|back|page | glide on|off|boot | car | theme on|off|boot|install | selftest | keys trace|toggle N|save N | beep N | shiftbeep N|off | sounds | probe on|img|off | rot deg|-deg|rad|-rad|off | boot on|off'
            say "   now: $(test -e /tmp/tt-tele-on && echo on || (test -e $K/tele-on && ! test -e /tmp/tt-tele-off && echo on || echo off)), demo $(test -e /tmp/tt-tele-demo && echo on || echo off), probe $(cat /tmp/tt-tele-probe 2>/dev/null || echo off), tilt $(cat /tmp/tt-tele-rot 2>/dev/null || echo -deg)"
            exit 2;;
     esac

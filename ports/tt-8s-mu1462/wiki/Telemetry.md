@@ -165,7 +165,17 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele19)
+## Autocross view on the head unit (tt-zoom tele20)
+
+The Haldex page draws the car's own livery from above (the user's top-down picture, the iPhone app's
+`CarTop.png`, 660 x 1360) under the drivetrain, placed with the app's `CarGeometry` (centre x 0.495,
+front axle 0.232, rear 0.788, half tracks 0.359 / 0.353, tyre 0.105 x 0.140). The simulator exports
+the two pictures at their screen size (`Theme --export`): `hx-car-up.rgba` 146 x 300 (Sport) and
+`hx-car-side.rgba` 384 x 186 (Classic, nose right). On the car: copy them to /tmp,
+`sh tt.sh tele car`, restart the MMI. Without them the page draws outlines (tele19).
+
+### Earlier: tele19
+
 
 **Haldex page** (user 2026-11-24, after the OpenHaldex iPhone app's drivetrain card,
 `ios/OpenHaldex/HaldexVisual.swift`): the car from above with an x-ray drivetrain (front axle ice,

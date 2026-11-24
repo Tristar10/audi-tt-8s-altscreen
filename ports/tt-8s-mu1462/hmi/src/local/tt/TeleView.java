@@ -76,6 +76,12 @@ public final class TeleView implements Runnable {
     private static final byte[][] THEME = new byte[2][];
     private static final boolean[] THEME_BAD = new boolean[2];
     private static volatile boolean themeOn;
+    /** tele20: the Haldex page's car pictures (simulator export), read once. */
+    private static final File[] CAR_FILES = {new File(DIR, "hx-car-up.rgba"), new File(DIR, "hx-car-side.rgba")};
+    private static final int[][] CAR_SIZE = {{TeleLayout.CAR_UP_W, TeleLayout.CAR_UP_H},
+        {TeleLayout.CAR_SIDE_W, TeleLayout.CAR_SIDE_H}};
+    private static final byte[][] CAR = new byte[2][];
+    private static boolean carTried;
     private static final File GLIDE_RAM = new File("/tmp/tt-tele-glide");
     private static final File GLIDE_FLASH = new File(DIR, "tele-glide");
     private static volatile boolean glide;
@@ -239,6 +245,7 @@ public final class TeleView implements Runnable {
                         int view = small ? TeleLayout.VIEW_SMALL : TeleLayout.VIEW_LARGE;
                         int theme = themeOn && themeLoaded(view) ? view : -1;
                         layout.themed = theme >= 0;
+                        layout.carArt = carLoaded();
                         layout.overflow = false;
                         layout.build(view, UI.page());
                         if (layout.overflow && !overflowNoted) {
@@ -319,6 +326,51 @@ public final class TeleView implements Runnable {
         other.build(small ? TeleLayout.VIEW_LARGE : TeleLayout.VIEW_SMALL, TeleLayout.PAGE_LIVE);
         prepareArt(TeleFrame.of(other, -1));
         prewarmedGen = gen;
+    }
+
+    /** Reads both car pictures once (premultiplied for EAL); true when both are there. */
+    private static boolean carLoaded() {
+        if (carTried) {
+            return CAR[0] != null && CAR[1] != null;
+        }
+        carTried = true;
+        for (int k = 0; k < 2; k++) {
+            File f = CAR_FILES[k];
+            long want = (long) CAR_SIZE[k][0] * CAR_SIZE[k][1] * 4;
+            if (!f.exists() || f.length() != want) {
+                RgdBus.note(new StringBuffer("tele car: ").append(f.getPath()).append(f.exists() ? " has the wrong size" : " missing")
+                    .append(" (drawn as outlines)").toString());
+                return false;
+            }
+            try {
+                byte[] b = new byte[(int) want];
+                java.io.FileInputStream in = new java.io.FileInputStream(f);
+                try {
+                    int o = 0;
+                    while (o < b.length) {
+                        int n = in.read(b, o, b.length - o);
+                        if (n < 0) {
+                            break;
+                        }
+                        o += n;
+                    }
+                } finally {
+                    in.close();
+                }
+                for (int j = 0; j < b.length; j += 4) {
+                    int a = b[j + 3] & 0xFF;
+                    b[j] = (byte) ((b[j] & 0xFF) * a / 255);
+                    b[j + 1] = (byte) ((b[j + 1] & 0xFF) * a / 255);
+                    b[j + 2] = (byte) ((b[j + 2] & 0xFF) * a / 255);
+                }
+                CAR[k] = b;
+            } catch (Throwable t) {
+                RgdBus.note(new StringBuffer("tele car: read failed ").append(String.valueOf(t)).toString());
+                return false;
+            }
+        }
+        RgdBus.note("tele car: pictures loaded");
+        return true;
     }
 
     /** Reads a view's theme picture from flash once (tick thread); false if missing or wrong size. */
@@ -428,7 +480,12 @@ public final class TeleView implements Runnable {
                 continue;
             }
             byte[] px;
-            if (f.kind[i] == TeleLayout.BOX) {
+            if (f.kind[i] == TeleLayout.IMAGE) {
+                px = CAR[f.size[i]];
+                if (px == null) {
+                    continue;
+                }
+            } else if (f.kind[i] == TeleLayout.BOX) {
                 px = solid(f.rgba[i]);
             } else if (f.kind[i] == TeleLayout.ICON) {
                 px = argbToRgba(TeleIcons.argb(f.size[i], f.w[i], f.h[i], f.rgba[i] >>> 8), f.rgba[i] & 0xFF);
@@ -449,6 +506,9 @@ public final class TeleView implements Runnable {
         }
         if (f.kind[i] == TeleLayout.QUAD) {
             return new Long(((long) (shapeKey(f, i) | 0x40000000) << 32) | (c & 0xFFFFFFFFL));
+        }
+        if (f.kind[i] == TeleLayout.IMAGE) {
+            return new Long(0x7700000000L | f.size[i]);
         }
         return null;
     }
@@ -875,7 +935,10 @@ public final class TeleView implements Runnable {
         }
         int tw;
         int th;
-        if (f.kind[i] == TeleLayout.BOX) {
+        if (f.kind[i] == TeleLayout.IMAGE) {
+            tw = CAR_SIZE[f.size[i]][0];
+            th = CAR_SIZE[f.size[i]][1];
+        } else if (f.kind[i] == TeleLayout.BOX) {
             tw = SOLID;
             th = SOLID;
         } else if (f.kind[i] == TeleLayout.ICON) {
