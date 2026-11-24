@@ -164,7 +164,24 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele3)
+## Autocross view on the head unit (tt-zoom tele4)
+
+tele3 on the car: once the view did not draw after `tele on` (a job posted while the HMI was still
+starting can be dropped, and the tick thread then waited for it forever), and after a quick restart
+the link stayed at "NO LINK" with OpenHaldex probing. tele4: a job with no answer in 2 s is given up
+and the frame sent again (`tele job lost` in the log); every 10 s while the view is on, one
+`tele stats:` line with frames/s, job times, a stuck job's age, and the receiver: port
+open/binding/closed, rx, acks, bad datagrams and the last sender in those 10 s, bind errors (logged
+on the first three and every 30th; the bind is retried every 2 s, e.g. while an exiting HMI still
+holds 49160).
+
+The switches are in /tmp: they survive an HMI-only restart, not a full MMI reboot (then the view is
+off unless `sh tt.sh tele boot on`).
+
+Wired CarPlay stopping during these tests was not tt-zoom: `smartphone_integrator` dropped the
+iPhone (`[SI] disconnectDevice`); forgetting the car on the iPhone and pairing again fixed it.
+
+### Earlier: tele3
 
 tele2 on the car (2026-11-23): `-deg` tilt is right. The car's font draws about 1.45x the preview's at
 the same size (cap height about the size itself), so texts crowded their neighbours; the gear was

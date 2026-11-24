@@ -468,7 +468,7 @@ autozoom)
     esac
     ;;
 tele)
-    # OpenHaldex autocross view (tt-zoom tele3, wiki Telemetry.md): our own full-screen picture over
+    # OpenHaldex autocross view (tt-zoom tele4, wiki Telemetry.md): our own full-screen picture over
     # the map tab (Classic) or the small view's map area (Sport). RAM switches, read within 1 s;
     # "boot" writes the one flash default.
     case "${2:-}" in

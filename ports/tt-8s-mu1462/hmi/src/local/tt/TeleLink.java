@@ -52,6 +52,12 @@ final class TeleLink implements Runnable {
     private static long rateWindow;
     private static int rateCount;
     private static String lastReply = "";
+    private static long acks;
+    private static long errors;
+    private static String lastFrom = "-";
+    private static long winRx;
+    private static long winAcks;
+    private static long winBad;
     private static DatagramSocket sock;
     private static final long T0 = System.currentTimeMillis();
 
@@ -104,12 +110,19 @@ final class TeleLink implements Runnable {
             } catch (InterruptedIOException timeout) {
                 // nothing for half a second: the view shows staleness
             } catch (Throwable t) {
-                RgdBus.note(new StringBuffer("tele rx error ").append(String.valueOf(t)).toString());
+                long e;
+                synchronized (LOCK) {
+                    e = ++errors;
+                }
+                if (e <= 3 || e % 30 == 0) {
+                    RgdBus.note(new StringBuffer("tele rx error #").append(e).append(' ').append(String.valueOf(t))
+                        .toString());
+                }
                 if (s != null) {
                     s.close();
                 }
                 sock = null;
-                sleep(2000L); // e.g. ttlink holds the port
+                sleep(2000L); // e.g. ttlink, or an HMI that has not exited yet, holds the port: bind again
             }
         }
     }
@@ -137,6 +150,7 @@ final class TeleLink implements Runnable {
                 lastSeq = seq;
                 lastRx = now;
                 rx++;
+                winRx++;
                 rateCount++;
                 if (now - rateWindow >= 1000L) {
                     rateHz = (int) (rateCount * 1000L / Math.max(1L, now - rateWindow));
@@ -162,6 +176,11 @@ final class TeleLink implements Runnable {
             wr32(a, 12, lost);
             wr32(a, 16, now - T0);
             s.send(new DatagramPacket(a, a.length, from, port));
+            synchronized (LOCK) {
+                acks++;
+                winAcks++;
+                lastFrom = from.getHostAddress();
+            }
         } else if (n >= 11 && magic(b, 'T', 'T', 'P', '1')) {
             if (rd32(b, 4) != key) {
                 bump(true);
@@ -321,6 +340,23 @@ final class TeleLink implements Runnable {
     private static void bump(boolean keyWrong) {
         synchronized (LOCK) {
             bad++;
+            winBad++;
+        }
+    }
+
+    /** One line for the 10 s stats: port state and what arrived since the last call. */
+    static String rxStats() {
+        long now = System.currentTimeMillis();
+        synchronized (LOCK) {
+            String r = new StringBuffer("rx port ").append(sock == null ? (wanted ? "binding" : "closed") : "open")
+                .append(", 10 s: rx ").append(winRx).append(" acks ").append(winAcks).append(" bad ").append(winBad)
+                .append(", from ").append(lastFrom).append(", last ")
+                .append(lastRx == 0 ? -1 : (now - lastRx) / 1000).append(" s ago, bind errors ").append(errors)
+                .append(", catalog ").append(catN).toString();
+            winRx = 0;
+            winAcks = 0;
+            winBad = 0;
+            return r;
         }
     }
 

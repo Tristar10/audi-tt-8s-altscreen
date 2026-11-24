@@ -78,6 +78,8 @@ public final class TeleView implements Runnable {
     private static long statAt;
     private static long statSlots;
     private static int artKey = -1;
+    private static volatile long postedAt;
+    private static long lostJobs;
 
     // HMI thread only
     private static IWrappedViewport vp;
@@ -133,8 +135,21 @@ public final class TeleView implements Runnable {
                     }
                 }
                 TeleLink.want(on && !demo);
+                if (on) {
+                    stats(now);
+                }
                 if (pending) {
-                    continue;
+                    // A job posted while the HMI was still starting can be dropped: then nothing would
+                    // ever be drawn again (tele3 "tele on does not draw"). Give up on it after 2 s.
+                    if (now - postedAt < 2000L) {
+                        continue;
+                    }
+                    synchronized (ART) {
+                        lostJobs++;
+                    }
+                    RgdBus.note("tele job lost (no answer in 2 s), sending again");
+                    pending = false;
+                    last = null;
                 }
                 boolean show = on && mapNow;
                 TeleFrame f;
@@ -163,6 +178,7 @@ public final class TeleView implements Runnable {
                     continue;
                 }
                 pending = true;
+                postedAt = now;
                 try {
                     m.getTerminal().getFramework().getHMIService().getEventDispatcher().postEvent(
                         new RunnableEvent(new TeleJob(m, f)));
@@ -192,21 +208,35 @@ public final class TeleView implements Runnable {
             long now = System.currentTimeMillis();
             if (statAt == 0) {
                 statAt = now;
-            } else if (now - statAt >= 10000L) {
-                line = new StringBuffer("tele stats: ").append(statJobs * 1000L / (now - statAt)).append(" frames/s, job avg ")
-                    .append(statMs / Math.max(1L, statJobs)).append(" ms max ").append(statMax).append(" ms, changed slots avg ")
-                    .append(statSlots / Math.max(1L, statJobs)).append(", art ").append(ART.size()).toString();
-                statJobs = 0;
-                statMs = 0;
-                statMax = 0;
-                statSlots = 0;
-                statAt = now;
             }
         }
         pending = false;
-        if (line != null) {
-            RgdBus.note(line);
+    }
+
+    /** Every 10 s while the view or its receiver is wanted (tick thread, so a stuck job shows too). */
+    private static void stats(long now) {
+        String line;
+        synchronized (ART) {
+            if (statAt == 0) {
+                statAt = now;
+                return;
+            }
+            if (now - statAt < 10000L) {
+                return;
+            }
+            line = new StringBuffer("tele stats: on=").append(on).append(" demo=").append(demo).append(" map=")
+                .append(mapNow).append(", ").append(statJobs * 1000L / (now - statAt)).append(" frames/s, job avg ")
+                .append(statMs / Math.max(1L, statJobs)).append(" ms max ").append(statMax)
+                .append(" ms, changed slots avg ").append(statSlots / Math.max(1L, statJobs)).append(", pending ")
+                .append(pending ? (now - postedAt) / 1000 : 0).append(" s, lost jobs ").append(lostJobs).append(", art ")
+                .append(ART.size()).append(" | ").append(TeleLink.rxStats()).toString();
+            statJobs = 0;
+            statMs = 0;
+            statMax = 0;
+            statSlots = 0;
+            statAt = now;
         }
+        RgdBus.note(line);
     }
 
     /** Off the HMI thread: draws every picture this frame shows that is not cached yet. */
