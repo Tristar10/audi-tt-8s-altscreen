@@ -484,7 +484,7 @@ tele)
             slay -f ttlink 2>/dev/null; say 'Stopped ttlink (it held UDP 49160, which the view needs).'
         fi
     }
-    # OpenHaldex autocross view (tt-zoom tele18, wiki Telemetry.md): our own full-screen picture over
+    # OpenHaldex autocross view (tt-zoom tele19, wiki Telemetry.md): our own full-screen picture over
     # the map tab (Classic) or the small view's map area (Sport). RAM switches, read within 1 s;
     # "boot" writes the one flash default.
     case "${2:-}" in
@@ -510,7 +510,8 @@ tele)
                 find /mnt /eso /fs -type f \( -name '*.wav' -o -name '*.WAV' -o -name '*.pcm' -o -name '*.mp3' -o -name '*.ogg' \) > /tmp/tt-sounds.txt 2>/dev/null
                 cat /tmp/tt-sounds.txt | head -60; say "$(wc -l < /tmp/tt-sounds.txt) files";;
         ui) case "${3:-}" in
-               open|up|down|press|back|close) echo "$3" > /tmp/tt-tele-ui; say "Control page: $3";;
+               open|up|down|press|back|close) echo "$3" > /tmp/tt-tele-ui; say "Control: $3";;
+               page) echo page > /tmp/tt-tele-ui; say 'Page: live view <-> Haldex page';;
                map) case "${4:-}" in
                       "") say 'Usage: sh tt.sh tele ui map "CODE EVENT ACTION" ...   (EVENT pressed|turned|long; ACTION open|up|down|press|back)'; exit 2;;
                       *) shift 3; : > /tmp/tt-tele-keymap; for l in "$@"; do echo "$l" >> /tmp/tt-tele-keymap; done; say "Key map (RAM):"; cat /tmp/tt-tele-keymap;; esac;;
@@ -593,7 +594,7 @@ tele)
                on) rw; touch $K/tele-on; ro; say 'Autocross view on at every MMI start.';;
                off) rw; rm -f $K/tele-on; ro; say 'Autocross view no longer on at start.';;
                *) say 'Usage: sh tt.sh tele boot on | off'; exit 2;; esac;;
-        *) say 'Usage: sh tt.sh tele on | off | demo on|off | ui open|up|down|press|back | glide on|off|boot | theme on|off|boot|install | selftest | keys trace|toggle N|save N | beep N | shiftbeep N|off | sounds | probe on|img|off | rot deg|-deg|rad|-rad|off | boot on|off'
+        *) say 'Usage: sh tt.sh tele on | off | demo on|off | ui open|up|down|press|back|page | glide on|off|boot | theme on|off|boot|install | selftest | keys trace|toggle N|save N | beep N | shiftbeep N|off | sounds | probe on|img|off | rot deg|-deg|rad|-rad|off | boot on|off'
            say "   now: $(test -e /tmp/tt-tele-on && echo on || (test -e $K/tele-on && ! test -e /tmp/tt-tele-off && echo on || echo off)), demo $(test -e /tmp/tt-tele-demo && echo on || echo off), probe $(cat /tmp/tt-tele-probe 2>/dev/null || echo off), tilt $(cat /tmp/tt-tele-rot 2>/dev/null || echo -deg)"
            exit 2;;
     esac

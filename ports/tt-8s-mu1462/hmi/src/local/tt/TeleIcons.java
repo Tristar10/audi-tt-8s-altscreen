@@ -26,7 +26,9 @@ public final class TeleIcons {
     public static final int ARCQ = 11;
     /** A hairline circle filling the picture (line 1 % of the size): the boost arc's edges. */
     public static final int RING = 12;
-    public static final int COUNT = 13;
+    /** A filled dot with a dark rim (the Haldex page's target marker). */
+    public static final int DOT = 13;
+    public static final int COUNT = 14;
 
     // Shape ops. CAP x0 y0 x1 y1 r (thick line, round ends) | CIRC x y r | RECT x0 y0 x1 y1 |
     // POLY n x0 y0 ... | CUT_CIRC x y r | CUT_RECT x0 y0 x1 y1 | CUT_POLY n x0 y0 ...
@@ -86,6 +88,8 @@ public final class TeleIcons {
         {CIRC, 0, 0, 100, CUT_CIRC, 0, 0, 71.5f},
         // RING: hairline circle
         {CIRC, 50, 50, 50, CUT_CIRC, 50, 50, 49},
+        // DOT
+        {CIRC, 50, 50, 46},
     };
 
     /**

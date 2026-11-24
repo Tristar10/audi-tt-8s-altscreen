@@ -165,7 +165,22 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele18)
+## Autocross view on the head unit (tt-zoom tele19)
+
+**Haldex page** (user 2026-11-24, after the OpenHaldex iPhone app's drivetrain card,
+`ios/OpenHaldex/HaldexVisual.swift`): the car from above with an x-ray drivetrain (front axle ice,
+prop shaft and rear lit cyan in 5 steps with the actual lock, torque dashes travelling rearward,
+faster with more lock, the coupling filling up, front wheels turned with the steering at 15:1), a
+270-degree ring gauge for the actual lock with the target as a pink dot, and TARGET, STEERING
+(channel 20) and CLUTCH (channel 19, bar to 120 °C, pink from 90). "STOCK CONTROL" when the mode is
+STOCK, "NOT CONNECTED" without link. Classic: car sideways (nose right) in the panel, gauge and stats
+right of it, the gear small top right; the strip, shift lights and corners stay. Sport: car upright
+on the left, gauge and stats on the right, under the shift lights; the warning frame stays.
+Switching: with the pop-up closed, roll (up/down) changes the page; `sh tt.sh tele ui page`; the
+long press still opens the pop-up on either page. Simulator: Up/Down, or `--ui page`.
+
+### Earlier: tele18
+
 
 User 2026-11-24: the Haldex control as a pop-up, not inside the panel. tele18:
 - **Pop-up card** over the dimmed view (Classic centred on the gear, Sport over the panel): three

@@ -240,12 +240,12 @@ public final class TeleView implements Runnable {
                         int theme = themeOn && themeLoaded(view) ? view : -1;
                         layout.themed = theme >= 0;
                         layout.overflow = false;
-                        layout.build(view, TeleLayout.PAGE_LIVE);
+                        layout.build(view, UI.page());
                         if (layout.overflow && !overflowNoted) {
                             overflowNoted = true;
                             RgdBus.note("tele layout: more than 400 slots, the extra ones are dropped");
                         }
-                        f = TeleFrame.of(layout, (small ? 1 : 0) | (UI.isOpen() ? 2 : 0) | (rotGen << 4));
+                        f = TeleFrame.of(layout, (small ? 1 : 0) | (UI.isOpen() ? 2 : 0) | (UI.page() << 2) | (rotGen << 4));
                         f.theme = theme;
                         prepareArt(f);
                     }

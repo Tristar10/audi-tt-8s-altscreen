@@ -37,6 +37,8 @@ public final class TeleLayout {
     public static final int VIEW_SMALL = 1;
     public static final int PAGE_LIVE = 0;
     public static final int PAGE_PRESETS = 1;
+    /** Haldex visualisation (tele19, after the OpenHaldex iPhone app's drivetrain card). */
+    public static final int PAGE_HALDEX = 2;
     public static final int BOX = 0;
     public static final int TEXT = 1;
     public static final int QUAD = 2;
@@ -69,6 +71,8 @@ public final class TeleLayout {
     public static final int CH_GEAR = 13;
     public static final int CH_DSG = 16;
     public static final int CH_CLUTCH = 19;
+    /** Steering angle in degrees, right positive (board channel 20). */
+    public static final int CH_STEER = 20;
     public static final int CH_PRESET = 22;
     /** OpenHaldex effective mode (MODES index; 11 = MANUAL), board v1.1.21. */
     public static final int CH_MODE = 12;
@@ -229,8 +233,11 @@ public final class TeleLayout {
     private long peakAt;
     private final double[] pb = new double[4];
 
+    private int page;
+
     public void build(int view, int page) {
         boolean large = view == VIEW_LARGE;
+        this.page = page;
         count = 0;
         box(0, 0, SCREEN_W, SCREEN_H, BG, true);
         if (page == PAGE_PRESETS)
@@ -239,7 +246,7 @@ public final class TeleLayout {
             liveLarge();
         else
             liveSmall();
-        if (uiOpen && page == PAGE_LIVE)
+        if (uiOpen && page != PAGE_PRESETS)
             popup(large);
     }
 
@@ -405,8 +412,10 @@ public final class TeleLayout {
             text(rd(pa[0]), rd(pa[1] - 0.46 * sz), sz, true, CENTER, nc, Integer.toString(k), true);
         }
 
+        boolean hxPage = page == PAGE_HALDEX;
         // Red line across with a soft glow, and the notch holding the gear: two layers for depth,
         // flashing with the shift lights from the shift point.
+        if (!hxPage) {
         quad(NOTCH_X0, LINE_Y, NOTCH_X1, LINE_Y, NOTCH_X1 - NOTCH_SLOPE, NOTCH_Y, NOTCH_X0 + NOTCH_SLOPE, NOTCH_Y,
             themed ? (hot ? 0x40100CA0 : 0x11060650) : hot ? NOTCH_HOT : NOTCH, true);
         box(GRID_X0, LINE_Y, NOTCH_X0 - GRID_X0 + 1, 2, RED, true);
@@ -416,8 +425,10 @@ public final class TeleLayout {
         quad(NOTCH_X1 - 1, LINE_Y, NOTCH_X1 + 1, LINE_Y, NOTCH_X1 - NOTCH_SLOPE + 1, NOTCH_Y,
             NOTCH_X1 - NOTCH_SLOPE - 1, NOTCH_Y, RED, true);
         box(NOTCH_X0 + NOTCH_SLOPE - 1, NOTCH_Y - 1, NOTCH_X1 - NOTCH_X0 - 2 * NOTCH_SLOPE + 2, 2, RED, true);
+        }
         int gc = !link ? GREY : over && !blink ? RED : WHITE;
-        gearGlyph(720, 208 + D_Y, 104, gc);
+        if (!hxPage)
+            gearGlyph(720, 208 + D_Y, 104, gc);
 
         // Top-left pocket, along the rising slope: the active OpenHaldex preset, its mode above it,
         // and a Wi-Fi warning only while the link is slow or lost.
@@ -450,6 +461,14 @@ public final class TeleLayout {
         slopeText(ba + 50, half(ba + 50) + 56 + 0.82 * 40, 40, false, LEFT, vc,
             ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
 
+        if (hxPage) {
+            // car sideways, nose to the right; gauge and stats to its right; the gear small in the corner
+            drivetrain(340, 232, 400, 196, true);
+            lockRing(860, 316, 62, 16);
+            hxStats(944, 238, 1100);
+            gearGlyph(1082, 236, 44, gc);
+            return;
+        }
         // Left of the notch: rpm, and the driver's inputs under it: accelerator (green) and brake
         // pressure (red, full bar at 100 bar).
         icon(GRID_X0 + 14, 210 + D_Y, 32, TeleIcons.TACH, ICONC, true);
@@ -723,6 +742,14 @@ public final class TeleLayout {
             quad(sx + 7, lyt + 3, sx + lw + 3, lyt + 3, sx + lw + 1, lyt + 10, sx + 5, lyt + 10, 0xFFFFFF5C, lit);
         }
 
+        if (page == PAGE_HALDEX) {
+            // car upright in the left column; gauge and stats on the right
+            drivetrain(24, 130, 190, 310, false);
+            lockRing(320, 212, 56, 14);
+            hxStats(236, 300, 424);
+            int gcS = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
+            gearGlyph(398, 388, 44, gcS);
+        } else {
         // Haldex lock: icon, strip with the target tick, percent.
         int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
         int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
@@ -759,6 +786,7 @@ public final class TeleLayout {
         bar(x0 + 44, 434, 250, 10, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
         text(x1 - 36, 420, 34, false, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
         text(x1, 434, 14, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
+        }
 
         // Redline warning frame on top: a thick red line along the panel outline with a glow,
         // flashing with the shift lights.
@@ -767,6 +795,191 @@ public final class TeleLayout {
             thick(SP_X[k], SP_Y[k], SP_X[j], SP_Y[j], 18, 0xFF3B3050, warn);
             thick(SP_X[k], SP_Y[k], SP_X[j], SP_Y[j], 6, RED, warn);
         }
+    }
+
+    // ---------------------------------------------------------------- Haldex page (tele19)
+    // After the OpenHaldex iPhone app's drivetrain card (HaldexVisual.swift): the car from above
+    // with an x-ray drivetrain, the rear lit cyan with the lock, torque dashes travelling rearward
+    // along the prop shaft (faster with more lock), the coupling filling up, the front wheels turned
+    // with the steering (15:1); a ring gauge for the actual lock with the target as a pink dot;
+    // target, steering and Haldex clutch temperature beside it. Colours from the app's theme.
+    private static final int HX_ICE = 0xE0EDFFFF;
+    private static final int HX_CYAN = 0x66DBFFFF;
+    private static final int HX_BLUE = 0x264DFFFF;
+    private static final int HX_PINK = 0xFF548FFF;
+    private static final int HX_NAVY = 0x05091CFF;
+    private static final int HX_IDLE = 0x1A1F2AFF;
+
+    /** Lock 0..100 as a cyan of rising strength (5 steps: few node colours on the car). */
+    private static int rearColour(int lock) {
+        if (lock <= 0)
+            return 0x5A6270FF;
+        int step = Math.min(4, (lock + 19) / 20);
+        return mix(0x24607AFF, HX_CYAN, step / 4f);
+    }
+
+    /**
+     * The car in the box (bx, by, bw, bh): sideways (nose right) when side, else upright (nose up).
+     * Body outline, x-ray drivetrain, wheels, the coupling, torque dashes, a steering trace.
+     */
+    private void drivetrain(int bx, int by, int bw, int bh, boolean side) {
+        int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
+        int modeNow = ok(CH_MODE) ? r(val[CH_MODE]) : -1;
+        boolean off = modeNow == 0;
+        double steer = ok(CH_STEER) ? val[CH_STEER] / 1000.0 : 0;
+        double road = Math.max(-35, Math.min(35, steer / 15.0)); // road-wheel angle, deg
+        // car geometry along its length L (0 nose .. 1 tail) and across W (-0.5 .. 0.5)
+        double len = side ? bw - 30 : bh - 24;
+        double wid = len * 0.44;
+        double cxa = side ? bx + bw / 2.0 : bx + bw / 2.0; // centre
+        double cya = side ? by + bh / 2.0 : by + bh / 2.0;
+        // body: a rounded outline from boxes (front, cabin, tail), dark with a hairline edge
+        bodyBox(-0.50, -0.46, 0.50, 0.46, cxa, cya, len, wid, side, 0x0B1430FF);
+        bodyBox(-0.12, -0.34, 0.20, 0.34, cxa, cya, len, wid, side, 0x13204AFF); // cabin glass
+        // axle positions (TT 8S: wheelbase 0.60 of the length, front axle at 0.22)
+        double fy = -0.28;
+        double ry = 0.32;
+        double cpl = ry - 0.07;
+        int rc = !link ? 0x5A6270FF : rearColour(act);
+        int fc = !link ? 0x6B7385FF : off ? 0xB4BECCFF : HX_ICE;
+        // axles and prop shaft
+        line(fy, -0.40, fy, 0.40, 4, fc, cxa, cya, len, wid, side);
+        line(fy, 0, cpl, 0, 4, act > 0 && link ? rc : 0x3A424BFF, cxa, cya, len, wid, side);
+        line(ry, -0.40, ry, 0.40, 4, rc, cxa, cya, len, wid, side);
+        // torque dashes moving rearward, faster with more lock (fixed set, positions move)
+        int nd = 5;
+        double speed = 0.25 + 0.75 * act / 100.0; // shaft lengths per second
+        double ph = (now % 100000L) / 1000.0 * speed;
+        for (int k = 0; k < nd; k++) {
+            double f = ((ph + k / (double) nd) % 1.0);
+            double a = fy + (cpl - fy) * f;
+            dash(a, cxa, cya, len, wid, side, link && act > 0 && !off);
+        }
+        // coupling: a box with a fill proportional to the lock
+        int[] c = pt(cpl, 0, cxa, cya, len, wid, side);
+        box(c[0] - 15, c[1] - 11, 30, 22, rc, true);
+        box(c[0] - 13, c[1] - 9, 26, 18, HX_NAVY, true);
+        box(c[0] - 11, c[1] - 7, 22 * act / 100, 14, HX_CYAN, link && act > 0);
+        // wheels: front turned with the steering, rear lit with the lock
+        double tl = 0.13 * len;
+        double tw = 0.07 * len;
+        wheel(fy, -0.43, road, tl, tw, fc, cxa, cya, len, wid, side);
+        wheel(fy, 0.43, road, tl, tw, fc, cxa, cya, len, wid, side);
+        wheel(ry, -0.43, 0, tl, tw, rc, cxa, cya, len, wid, side);
+        wheel(ry, 0.43, 0, tl, tw, rc, cxa, cya, len, wid, side);
+        // split tags at the axles, and the state tag
+        text(c[0], c[1] + (side ? 16 : 14), 14, true, CENTER, HX_ICE, percent(act), link && act > 0 && side);
+        String tag = !link ? "NOT CONNECTED" : off ? "STOCK CONTROL" : null;
+        text(side ? bx + 8 : bx + bw / 2, side ? by + 2 : by + bh - 16, 13, true, side ? LEFT : CENTER,
+            !link ? HX_PINK : HX_ICE, tag, tag != null);
+    }
+
+    /** A point at (l along, w across) of the car, in screen px. */
+    private static int[] pt(double l, double w, double cx, double cy, double len, double wid, boolean side) {
+        double a = l * len;
+        double b = w * wid;
+        // side: nose right, so along = -x; upright: nose up, along = +y
+        return side ? new int[] {(int) Math.round(cx - a), (int) Math.round(cy + b)}
+            : new int[] {(int) Math.round(cx + b), (int) Math.round(cy + a)};
+    }
+
+    private void bodyBox(double l0, double w0, double l1, double w1, double cx, double cy, double len, double wid,
+                         boolean side, int c) {
+        int[] p = pt(l0, w0, cx, cy, len, wid, side);
+        int[] q = pt(l1, w1, cx, cy, len, wid, side);
+        int x = Math.min(p[0], q[0]);
+        int y = Math.min(p[1], q[1]);
+        box(x - 1, y - 1, Math.abs(q[0] - p[0]) + 2, Math.abs(q[1] - p[1]) + 2, 0x2C3A52FF, true);
+        box(x, y, Math.abs(q[0] - p[0]), Math.abs(q[1] - p[1]), c, true);
+    }
+
+    private void line(double l0, double w0, double l1, double w1, int t, int c, double cx, double cy, double len,
+                      double wid, boolean side) {
+        int[] p = pt(l0, w0, cx, cy, len, wid, side);
+        int[] q = pt(l1, w1, cx, cy, len, wid, side);
+        thick(p[0], p[1], q[0], q[1], t + 4, 0x0000008C, true); // dark under-stroke
+        thick(p[0], p[1], q[0], q[1], t, c, true);
+    }
+
+    private void dash(double l, double cx, double cy, double len, double wid, boolean side, boolean v) {
+        int[] p = pt(l, 0, cx, cy, len, wid, side);
+        if (side)
+            box(p[0] - 3, p[1] - 1, 6, 3, WHITE, v);
+        else
+            box(p[0] - 1, p[1] - 3, 3, 6, WHITE, v);
+    }
+
+    /** A tyre centred at (l, w), turned by deg (clockwise seen from above). */
+    private void wheel(double l, double w, double deg, double tl, double tw, int c, double cx, double cy, double len,
+                       double wid, boolean side) {
+        int[] p = pt(l, w, cx, cy, len, wid, side);
+        // a turned box turns about the middle of its start edge: start half a tyre back along it
+        double ang = side ? deg : deg - 90; // side: the tyre runs along x (0 deg); upright: along y
+        double rad = Math.toRadians(ang);
+        double sx = p[0] - Math.cos(rad) * tl / 2;
+        double sy = p[1] - Math.sin(rad) * tl / 2;
+        rbox(sx, sy, tl, tw + 4, ang, c, true);
+        rbox(sx + Math.cos(rad) * 2, sy + Math.sin(rad) * 2, tl - 4, tw, ang, HX_NAVY, true);
+    }
+
+    /** The lock ring: 270 degrees open at the bottom, 30 segments, the target as a pink dot. */
+    private void lockRing(int cx, int cy, int r, int thick) {
+        int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
+        int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
+        int segs = 30;
+        for (int i = 0; i < segs; i++) {
+            double a0 = 225 - 270.0 * i / segs - 0.8;
+            double a1 = 225 - 270.0 * (i + 1) / segs + 0.8;
+            boolean on = link && act > 0 && i * 100 / segs < act;
+            ring(cx, cy, r - thick, r, a0, a1, on ? mix(HX_BLUE, HX_CYAN, i / (float) segs) : HX_IDLE, true);
+        }
+        for (int i = 0; i <= 10; i++) {
+            double a = 225 - 27.0 * i;
+            ring(cx, cy, r - thick - (i % 5 == 0 ? 9 : 5), r - thick - 2, a + 0.6, a - 0.6,
+                i % 5 == 0 ? 0xFFFFFF80 : 0xFFFFFF33, true);
+        }
+        // target dot: one fixed dot per 5 %, the one at the target shows
+        for (int i = 0; i <= 20; i++) {
+            double a = Math.toRadians(225 - 270.0 * i / 20);
+            int dx = (int) Math.round(cx + Math.cos(a) * (r - thick / 2.0));
+            int dy = (int) Math.round(cy - Math.sin(a) * (r - thick / 2.0));
+            icon(dx - 7, dy - 7, 14, TeleIcons.DOT, HX_PINK, link && ok(CH_HX_TARGET) && i == (tgt + 2) / 5);
+        }
+        text(cx, cy - r / 3 - 4, r * 3 / 4, true, CENTER, link ? WHITE : GREY, link ? Integer.toString(act) : "-", true);
+        text(cx, cy + r / 2 + 8, 12, true, CENTER, GREY, "% LOCK", true);
+    }
+
+    /** Ring segment between radii from angle a0 to a1 (degrees, counter-clockwise from the right). */
+    private void ring(int cx, int cy, double rIn, double rOut, double a0, double a1, int c, boolean v) {
+        double r0 = Math.toRadians(a0);
+        double r1 = Math.toRadians(a1);
+        quad(cx + rd(Math.cos(r0) * rOut), cy - rd(Math.sin(r0) * rOut), cx + rd(Math.cos(r1) * rOut),
+            cy - rd(Math.sin(r1) * rOut), cx + rd(Math.cos(r1) * rIn), cy - rd(Math.sin(r1) * rIn),
+            cx + rd(Math.cos(r0) * rIn), cy - rd(Math.sin(r0) * rIn), c, v);
+    }
+
+    /** TARGET, STEERING, CLUTCH: label over value, in a column from x0 to x1 starting at y0. */
+    private void hxStats(int x0, int y0, int x1) {
+        int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
+        int vc = link ? WHITE : GREY;
+        text(x0, y0, 12, true, LEFT, GREY, "TARGET", true);
+        box(x0, y0 + 26, 6, 6, HX_PINK, link);
+        text(x0 + 12, y0 + 16, 24, true, LEFT, vc, ok(CH_HX_TARGET) ? percent(tgt) : "-", true);
+        text(x0, y0 + 50, 12, true, LEFT, GREY, "STEERING", true);
+        String st = "-";
+        if (ok(CH_STEER)) {
+            int d = r(val[CH_STEER]);
+            st = new StringBuffer(d > 0 ? "+" : "").append(d).append('°').toString();
+        }
+        text(x0, y0 + 66, 24, true, LEFT, vc, st, true);
+        int ct = ok(CH_CLUTCH) ? r(val[CH_CLUTCH]) : -1;
+        boolean hot = ct >= 90;
+        text(x0, y0 + 100, 12, true, LEFT, GREY, "CLUTCH", true);
+        text(x0, y0 + 116, 24, true, LEFT, hot ? HX_PINK : vc, ct >= 0 ? temp(ct) : "-", true);
+        int bw = x1 - x0 - 4;
+        box(x0, y0 + 146, bw, 6, HX_IDLE, true);
+        box(x0 + bw * 90 / 120, y0 + 144, 2, 10, 0xFF548F60, true);
+        box(x0, y0 + 146, ct > 0 ? Math.max(6, bw * Math.min(ct, 120) / 120) : 0, 6, hot ? HX_PINK : HX_CYAN, ct > 0);
     }
 
     /** A line from (ax,ay) to (bx,by), w px thick, as a quad (a little longer to close joints). */

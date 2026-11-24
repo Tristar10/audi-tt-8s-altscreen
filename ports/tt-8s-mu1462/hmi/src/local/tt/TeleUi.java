@@ -34,6 +34,8 @@ public final class TeleUi {
     public static final int ROW_LOCK = 2;
 
     private boolean open;
+    /** The page shown (TeleLayout.PAGE_LIVE or PAGE_HALDEX); roll with the pop-up closed changes it. */
+    private int page = TeleLayout.PAGE_LIVE;
     private int cursor;
     private boolean edit;
     private int editPreset;
@@ -63,12 +65,19 @@ public final class TeleUi {
             return 0;
         }
         a = a.trim();
+        if (a.equals("page")) {
+            return DOWN; // with the pop-up closed, roll changes the page
+        }
         return a.equals("open") ? OPEN : a.equals("up") ? UP : a.equals("down") ? DOWN : a.equals("press") ? PRESS
             : a.equals("back") ? BACK : a.equals("close") ? CLOSE : 0;
     }
 
     public boolean isOpen() {
         return open;
+    }
+
+    public int page() {
+        return page;
     }
 
     /** Once per tick, after the layout's values are in and before it is built. */
@@ -115,6 +124,10 @@ public final class TeleUi {
             return;
         }
         if (!open) {
+            // pop-up closed: roll changes the page (live view <-> Haldex page)
+            if (act == UP || act == DOWN) {
+                page = page == TeleLayout.PAGE_HALDEX ? TeleLayout.PAGE_LIVE : TeleLayout.PAGE_HALDEX;
+            }
             return;
         }
         if (act == UP || act == DOWN) {

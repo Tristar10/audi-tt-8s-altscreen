@@ -397,6 +397,7 @@ final class TeleLink implements Runnable {
         put(t, TeleLayout.CH_IAT, 38);
         put(t, TeleLayout.CH_DSG, 80);
         put(t, TeleLayout.CH_CLUTCH, 45 + 50 * f);
+        put(t, TeleLayout.CH_STEER, 180 * Math.sin(now / 2300.0));
         put(t, TeleLayout.CH_PRESET, demoPreset);
         put(t, TeleLayout.CH_MODE, demoMode);
         put(t, TeleLayout.CH_LOCK_SET, demoLock);
