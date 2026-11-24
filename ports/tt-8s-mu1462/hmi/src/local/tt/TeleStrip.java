@@ -145,19 +145,14 @@ public final class TeleStrip {
     }
 
     /**
-     * The "glass tube" look on a lit colour: a highlight band along the upper part, a darker lower
-     * edge, faint diagonal lines (the wrap's stripes), darker ticks.
+     * The lit colour flat, with one soft highlight band along its upper part, and darker ticks.
      */
     private static int glass(int c, double side, double hw, double x, double y, double tick) {
         double u = side / hw; // -1 lower edge .. +1 upper edge
-        double hi = Math.max(0, 1 - Math.abs(u - 0.45) / 0.28); // highlight band
-        int o = TeleLayout.mix(c, TeleLayout.WHITE, (float) (0.38 * hi));
-        if (u < -0.45) {
-            o = TeleLayout.mix(o, TeleLayout.BG, (float) (0.35 * (-u - 0.45) / 0.55));
-        }
-        if (((int) Math.floor((x - y) / 3.0) % 3) == 0) {
-            o = TeleLayout.mix(o, TeleLayout.BG, 0.07f);
-        }
+        // flat colour with one soft highlight along the top (user 2026-11-24: no texture inside
+        // the fill, no dark lower edge)
+        double hi = Math.max(0, 1 - Math.abs(u - 0.5) / 0.3);
+        int o = TeleLayout.mix(c, TeleLayout.WHITE, (float) (0.3 * hi));
         return TeleLayout.mix(o, TeleLayout.BG, (float) (tick * 0.5));
     }
 

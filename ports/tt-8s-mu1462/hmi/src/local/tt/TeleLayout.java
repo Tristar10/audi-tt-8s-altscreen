@@ -494,9 +494,8 @@ public final class TeleLayout {
         text(bx, ly2 + 6, 16, false, LEFT, GREY, boostPsi ? "-14" : "-1", true);
         text(zx, ly2 + 6, 16, false, CENTER, GREY, "0", true);
         text(bx + bwAll, ly2 + 6, 16, false, RIGHT, GREY, boostPsi ? "+22" : "+1.5", true);
-        // glass: a highlight across the bar's upper third, a dark lower edge
+        // one soft highlight across the bar's upper part (no dark lower edge)
         box(bx, by + 4, bwAll, bh / 4, 0xFFFFFF30, true);
-        box(bx, by + bh - 5, bwAll, 5, 0x00000050, true);
         // peak: a small sakura triangle above the bar
         int pk = (int) Math.round(segN * (clamp(peakKpa, BOOST_MIN, BOOST_MAX) - BOOST_MIN) / (double) range);
         int px = bx + pk * pitch - 2;
