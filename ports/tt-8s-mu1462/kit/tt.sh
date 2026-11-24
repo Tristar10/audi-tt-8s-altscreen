@@ -468,15 +468,22 @@ autozoom)
     esac
     ;;
 tele)
+    # The view's receiver needs UDP 49160. ttlink (the link-test tool) binds the same port; only one
+    # can hold it, so the view stops a running ttlink. Nothing else is touched.
+    tele_free(){
+        if pidin ar 2>/dev/null | grep -v grep | grep -q ttlink; then
+            slay -f ttlink 2>/dev/null; say 'Stopped ttlink (it held UDP 49160, which the view needs).'
+        fi
+    }
     # OpenHaldex autocross view (tt-zoom tele4, wiki Telemetry.md): our own full-screen picture over
     # the map tab (Classic) or the small view's map area (Sport). RAM switches, read within 1 s;
     # "boot" writes the one flash default.
     case "${2:-}" in
-        on) rm -f /tmp/tt-tele-off; touch /tmp/tt-tele-on; say 'Autocross view on (shows on the map tab).';;
+        on) rm -f /tmp/tt-tele-off; touch /tmp/tt-tele-on; tele_free; say 'Autocross view on (shows on the map tab).';;
         off) rm -f /tmp/tt-tele-on; touch /tmp/tt-tele-off; say 'Autocross view off.';;
         demo) case "${3:-on}" in
                on) touch /tmp/tt-tele-demo; say 'Demo values on: sweeping fake data, no OpenHaldex needed.';;
-               off) rm -f /tmp/tt-tele-demo; say 'Demo values off: live OpenHaldex data.';;
+               off) rm -f /tmp/tt-tele-demo; tele_free; say 'Demo values off: live OpenHaldex data.';;
                *) say 'Usage: sh tt.sh tele demo on | off'; exit 2;; esac;;
         rot) case "${3:-}" in
                deg|-deg|rad|-rad|off) echo "$3" > /tmp/tt-tele-rot; say "Tilted text and icons: $3";;
