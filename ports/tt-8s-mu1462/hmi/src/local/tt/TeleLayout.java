@@ -157,6 +157,8 @@ public final class TeleLayout {
     public boolean boostPsi = false;
     /** Draw the rev strip as TeleStrip's two pictures (STRIP slots) instead of pieces (tele8 probe). */
     public boolean paintedStrip = false;
+    /** Itasha theme on: the notch's fill is see-through so the theme's rings show behind the gear. */
+    public boolean themed = false;
 
     // Input: latest values (x1000), whether each is fresh, link state, preset catalog.
     public final int[] val = new int[CHANNELS];
@@ -349,7 +351,7 @@ public final class TeleLayout {
         // Red line across with a soft glow, and the notch holding the gear: two layers for depth,
         // flashing with the shift lights from the shift point.
         quad(NOTCH_X0, LINE_Y, NOTCH_X1, LINE_Y, NOTCH_X1 - NOTCH_SLOPE, NOTCH_Y, NOTCH_X0 + NOTCH_SLOPE, NOTCH_Y,
-            hot ? NOTCH_HOT : NOTCH, true);
+            themed ? (hot ? 0x40100CA0 : 0x11060650) : hot ? NOTCH_HOT : NOTCH, true);
         box(GRID_X0, LINE_Y, NOTCH_X0 - GRID_X0 + 1, 2, RED, true);
         box(NOTCH_X1 - 1, LINE_Y, GRID_X1 - NOTCH_X1 + 1, 2, RED, true);
         quad(NOTCH_X0 - 1, LINE_Y, NOTCH_X0 + 1, LINE_Y, NOTCH_X0 + NOTCH_SLOPE + 1, NOTCH_Y,
