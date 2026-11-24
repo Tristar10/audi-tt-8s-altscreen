@@ -674,51 +674,124 @@ public final class TeleLayout {
         return sb.toString();
     }
 
+    /**
+     * The Sport view's panel outline, tracing what the cluster lets through (user 2026-11-24): the
+     * frame's diagonal top-left, under the stock status line, down the right side and around the
+     * big rev counter (centre 791,288; 8 px outside its 290 px ring), along the bottom. Shared
+     * with the theme's housing and the redline warning frame.
+     */
+    static final int[] SP_X;
+    static final int[] SP_Y;
+
+    static {
+        int[] xs = new int[16];
+        int[] ys = new int[16];
+        int n = 0;
+        xs[n] = 8;
+        ys[n++] = 120;
+        xs[n] = 184;
+        ys[n++] = 74;
+        xs[n] = 512;
+        ys[n++] = 74;
+        for (int y = 183; y <= 393; y += 30) {
+            int dy = y - 288;
+            xs[n] = (int) Math.round(791 - Math.sqrt(298.0 * 298.0 - dy * dy));
+            ys[n++] = y;
+        }
+        xs[n] = 512;
+        ys[n++] = 460;
+        xs[n] = 8;
+        ys[n++] = 460;
+        SP_X = new int[n];
+        SP_Y = new int[n];
+        System.arraycopy(xs, 0, SP_X, 0, n);
+        System.arraycopy(ys, 0, SP_Y, 0, n);
+    }
+
     private void liveSmall() {
-        // Only the map area left of the big rev counter shows: x 0..520, below a diagonal from
-        // (0,110) to (200,50) and the stock status line, above y 440. From the top: preset and mode,
-        // a Haldex lock strip, the gear with the temperatures beside it, a boost strip.
+        // Only the map area left of the big rev counter shows (SP_X/SP_Y). From the top: Haldex
+        // lock, the gear with the temperatures beside it, preset and mode, boost. 2026-11-24: content
+        // 20 px further left (the doll chibi sits clear of the tach), oil temperature dropped (the
+        // stock Sport view shows it), the rest bigger.
         int rpm = ok(CH_RPM) ? r(val[CH_RPM]) : 0;
         boolean blink = (now / 100) % 2 == 0;
         boolean over = link && rpm >= shiftRpm;
         boolean limit = link && rpm >= limitRpm;
         int vc = link ? WHITE : GREY;
-        // tele5 photo: values at x 492 ran under the rev counter's ring, the preset row at y 72 was
-        // under the stock status line, and the strip's icon at x 24 under the frame.
-        int x0 = 52;
-        int x1 = 432;
+        int x0 = 32;
+        int x1 = 416;
+
+        // Redline warning, under everything else: a red tint over the panel and a hazard band
+        // along its top, both flashing with the shift lights (fixed shapes, only shown or hidden).
+        boolean warn = over && blink;
+        box(8, 120, 486, 340, 0xFF3B3030, warn);
+        quad(8, 120, 184, 74, 494, 74, 494, 120, 0xFF3B3030, warn);
+        for (int i = 0; i < 12; i++) {
+            int sx = 196 + i * 26;
+            quad(sx, 78, sx + 13, 78, sx + 3, 98, sx - 10, 98, 0xFF3B30C0, warn);
+        }
 
         // Haldex lock: icon, strip with the target tick, percent.
         int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
         int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
-        icon(x0, 118, 28, TeleIcons.AWD, ICONC, true);
-        bar(x0 + 40, 129, 240, 6, act, 0, link ? HALDEX : GREY, -1);
-        box(x0 + 40 + 240 * tgt / 100 - 1, 124, 2, 16, WHITE, ok(CH_HX_TARGET));
-        text(x1, 116, 30, false, RIGHT, vc, ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
-
-        // Preset and mode under the gear; Wi-Fi warning beside them while the link is slow or lost.
-        text(x0, 336, 26, false, LEFT, link ? PRESET : GREY, presetName(), true);
-        text(x0 + 2, 364, 14, true, LEFT, GREY, presetMode(), true);
-        boolean slow = link && rateHz >= 0 && rateHz < 10;
-        icon(200, 340, 22, TeleIcons.WIFI, AMBER, !link || slow);
+        icon(x0, 110, 32, TeleIcons.AWD, ICONC, true);
+        bar(x0 + 44, 121, 250, 10, act, 0, link ? HALDEX : GREY, -1);
+        box(x0 + 44 + 250 * tgt / 100 - 1, 114, 2, 24, WHITE, ok(CH_HX_TARGET));
+        text(x1, 106, 36, false, RIGHT, vc, ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
 
         // Gear, red past the shift point, flashing at the limiter; temperatures beside it.
         int gc = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
-        gearGlyph(128, 160, 150, gc);
-        text(128, 310, 22, true, CENTER, AMBER, "NO LINK", !link);
-        box(244, 158, 2, 210, LINE, true);
-        for (int t = 0; t < T_CH.length; t++)
-            tempCell(t, 262, x1, 158 + t * 42, 30, 30, rpm);
+        gearGlyph(112, 158, 170, gc);
+        text(112, 318, 22, true, CENTER, AMBER, "NO LINK", !link);
+        box(222, 160, 2, 196, LINE, true);
+        int row = 0;
+        for (int t = 0; t < T_CH.length; t++) {
+            if (T_CH[t] == CH_OIL)
+                continue; // the stock Sport view shows oil temperature
+            tempCell(t, 240, x1, 160 + row * 50, 34, 36, rpm);
+            row++;
+        }
+
+        // Preset and mode under the gear; Wi-Fi warning beside them while the link is slow or lost.
+        text(x0, 344, 28, false, LEFT, link ? PRESET : GREY, presetName(), true);
+        text(x0 + 2, 374, 15, true, LEFT, GREY, presetMode(), true);
+        boolean slow = link && rateHz >= 0 && rateHz < 10;
+        icon(190, 346, 22, TeleIcons.WIFI, AMBER, !link || slow);
 
         // Boost: icon, strip from vacuum to boost with zero marked, value in bar.
         int kpa = ok(CH_BOOST) ? r(val[CH_BOOST]) : 0;
         boolean boosting = link && kpa > 0;
         int zero = (0 - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN);
         int pos = clamp((kpa - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN), 0, 100);
-        icon(x0, 396, 28, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
-        bar(x0 + 40, 408, 240, 6, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
-        text(x1 - 34, 394, 30, false, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
-        text(x1, 406, 13, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
+        icon(x0, 404, 30, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
+        bar(x0 + 44, 414, 250, 10, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
+        text(x1 - 36, 400, 34, false, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
+        text(x1, 414, 14, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
+
+        // Redline warning frame on top: a thick red line along the panel outline with a glow,
+        // flashing with the shift lights.
+        for (int k = 0; k < SP_X.length; k++) {
+            int j = (k + 1) % SP_X.length;
+            thick(SP_X[k], SP_Y[k], SP_X[j], SP_Y[j], 18, 0xFF3B3050, warn);
+            thick(SP_X[k], SP_Y[k], SP_X[j], SP_Y[j], 6, RED, warn);
+        }
+    }
+
+    /** A line from (ax,ay) to (bx,by), w px thick, as a quad (a little longer to close joints). */
+    private void thick(int ax, int ay, int bx, int by, int w, int c, boolean v) {
+        double dx = bx - ax;
+        double dy = by - ay;
+        double l = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+        double ux = dx / l;
+        double uy = dy / l;
+        double nx = -uy * w / 2;
+        double ny = ux * w / 2;
+        double e = w / 2.0;
+        double sx = ax - ux * e;
+        double sy = ay - uy * e;
+        double ex = bx + ux * e;
+        double ey = by + uy * e;
+        quad(rd(sx + nx), rd(sy + ny), rd(ex + nx), rd(ey + ny), rd(ex - nx), rd(ey - ny), rd(sx - nx), rd(sy - ny), c, v);
     }
 
     /** One temperature: icon at x0, value right-aligned at x1, coloured by level. */

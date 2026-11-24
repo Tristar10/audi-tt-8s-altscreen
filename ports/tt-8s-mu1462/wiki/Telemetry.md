@@ -165,7 +165,18 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele12)
+## Autocross view on the head unit (tt-zoom tele13)
+
+Sport view (user 2026-11-24): the panel outline (TeleLayout SP_X/SP_Y) traces what the cluster lets
+through: the frame's diagonal, under the stock status line, around the big rev counter (8 px outside
+its ring), along the bottom; the theme's housing uses the same outline. Content 20 px further left;
+oil temperature dropped (the stock Sport view shows it), Haldex and boost bars 10 px, gear 170 px,
+temperatures 36 px on 50 px rows. From the shift point a warning flashes with the shift lights: a
+thick red frame with a glow along the outline, a red tint over the panel and a hazard band along its
+top (fixed shapes, only shown or hidden).
+
+### Earlier: tele12
+
 
 Steering-wheel keys (2026-11-24): the HMI queues key events on its event dispatcher, which accepts
 filters (`HMIService.getEventDispatcherAdmin().addEventFilter`, `BaseJobFilter`; the stock
