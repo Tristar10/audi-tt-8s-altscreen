@@ -164,7 +164,20 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele6)
+## Autocross view on the head unit (tt-zoom tele7)
+
+tele5 photos and the tele6 preview: the slopes still showed seams and steps, the boost arc was
+stepped, in Sport the values ran under the rev counter's ring and the preset row sat under the stock
+status line, in Classic the preset ran off the left edge. tele7:
+- Slopes: whole pieces are tapered quads that share edges (all tracks drawn before all fills); only
+  the piece holding the rpm adds a box scaled to it.
+- Boost: one fixed coloured ring (60 pieces, never redrawn) and a cover in the track colour made of
+  two quarter rings (TeleIcons ARCQ) turned to the boost about the arc's centre; a black block under
+  the centre line hides the cover's lower half. The arc sweeps smoothly and costs two turns a frame.
+- Sport: content between x 52 and 432; preset and mode under the gear. Classic: preset at 30 % of the
+  rising slope; glow behind the gear narrower (clear of the boost arc).
+
+### Earlier: tele6
 
 First road test (tele5 + OpenHaldex v1.1.19, 2026-11-23): mildly successful. Found: the screen froze
 on reaching the limiter (all 84 strip pieces changed colour on every flash, and the first time each

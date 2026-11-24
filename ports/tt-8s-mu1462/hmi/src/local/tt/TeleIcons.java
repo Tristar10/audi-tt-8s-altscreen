@@ -19,7 +19,12 @@ public final class TeleIcons {
     public static final int PEDAL = 8;
     public static final int TURBO = 9;
     public static final int BRAKE = 10;
-    public static final int COUNT = 11;
+    /**
+     * A quarter ring with its centre at the picture's top-left corner (the boost arc's cover; ring
+     * 83..116 px when drawn 116 px). Turned about that corner it hides a 90 degree stretch of the arc.
+     */
+    public static final int ARCQ = 11;
+    public static final int COUNT = 12;
 
     // Shape ops. CAP x0 y0 x1 y1 r (thick line, round ends) | CIRC x y r | RECT x0 y0 x1 y1 |
     // POLY n x0 y0 ... | CUT_CIRC x y r | CUT_RECT x0 y0 x1 y1 | CUT_POLY n x0 y0 ...
@@ -75,6 +80,8 @@ public final class TeleIcons {
         {CIRC, 50, 50, 46, CUT_CIRC, 50, 50, 38, CUT_RECT, 24, 0, 76, 100, CUT_RECT, 0, 0, 100, 16,
             CUT_RECT, 0, 84, 100, 100, CIRC, 50, 50, 30, CUT_CIRC, 50, 50, 22,
             CAP, 50, 36, 50, 52, 4.5f, CIRC, 50, 63, 4.5f},
+        // ARCQ: quarter ring about the top-left corner
+        {CIRC, 0, 0, 100, CUT_CIRC, 0, 0, 71.5f},
     };
 
     /**

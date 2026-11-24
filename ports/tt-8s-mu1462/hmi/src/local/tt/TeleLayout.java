@@ -217,10 +217,10 @@ public final class TeleLayout {
 
         // Glow behind the gear: layered translucent red, brighter while the shift cue flashes.
         boolean hot = over && blink;
-        int[] gw = {300, 240, 180};
+        int[] gw = {170, 135, 100};
         int[] ga = {hot ? 0x22 : 0x10, hot ? 0x30 : 0x18, hot ? 0x48 : 0x22};
         for (int i = 0; i < gw.length; i++)
-            quad(720 - gw[i], 176, 720 + gw[i], 176, 720 + gw[i] - 70, 352, 720 - gw[i] + 70, 352,
+            quad(720 - gw[i], 176, 720 + gw[i], 176, 720 + gw[i] - 40, 352, 720 - gw[i] + 40, 352,
                 (RED & 0xFFFFFF00) | ga[i], true);
 
         // Shift lights above the strip, as wide as its fat middle, slanted like the housing's slopes,
@@ -266,6 +266,8 @@ public final class TeleLayout {
         int fc = over ? RED : stripColourAt(rpm);
         boolean fillOn = link && !(limit && !blink);
         int pieces = 2 * SLOPE_PIECES + 1;
+        // Two passes: every track first, then every fill, so no track covers a fill's overlap.
+        for (int pass = 0; pass < 2; pass++)
         for (int k = 0; k < pieces; k++) {
             double s0;
             double s1;
@@ -287,18 +289,26 @@ public final class TeleLayout {
             if (k == SLOPE_PIECES) {
                 int y0 = TP_Y[1] - HALF_MAX;
                 int w0 = TP_X[2] - TP_X[1];
-                box(TP_X[1], y0, w0, 2 * HALF_MAX, track, true);
-                box(TP_X[1], y0, (int) Math.round(w0 * frac), 2 * HALF_MAX, fc, fillOn && frac > 0);
+                if (pass == 0)
+                    box(TP_X[1], y0, w0, 2 * HALF_MAX, track, true);
+                else
+                    box(TP_X[1], y0, (int) Math.round(w0 * frac), 2 * HALF_MAX, fc, fillOn && frac > 0);
             } else {
-                double th = 2 * half((s0 + s1) / 2);
-                double ext = k == SLOPE_PIECES - 1 || k == SLOPE_PIECES + 1 ? 4 : 2.5; // close the joints
-                double from = k == SLOPE_PIECES + 1 ? s0 - 3 : s0;
+                // Track and full fill: tapered quads that share their edges exactly (no steps); the
+                // piece holding the current rpm adds a box scaled to it (tele7: tele6 boxes showed
+                // seams and steps).
+                double e1 = k == SLOPE_PIECES - 1 ? 0 : 1.5; // overlap hides the joint
+                if (pass == 0) {
+                    bandOff(s0, s1 + e1, -half(s0), half(s0), -half(s1 + e1), half(s1 + e1), track, true);
+                    continue;
+                }
+                bandOff(s0, s1 + e1, -half(s0), half(s0), -half(s1 + e1), half(s1 + e1), fc, fillOn && frac >= 1);
+                double th = 2 * half(s0 + (s1 - s0) * frac / 2);
+                double from = k == SLOPE_PIECES + 1 ? s0 - 2 : s0;
                 tp(from + 0.5, pa);
                 double ang = Math.toDegrees(Math.atan2(pa[2], -pa[3]));
                 tp(from, pa);
-                double full = s1 - from + ext;
-                rbox(pa[0], pa[1], full, th, ang, track, true);
-                rbox(pa[0], pa[1], frac >= 1 ? full : (s1 - from) * frac, th, ang, fc, fillOn && frac > 0);
+                rbox(pa[0], pa[1], (s1 - from) * frac, th, ang, fc, fillOn && frac > 0 && frac < 1);
             }
         }
         // Shift point: a red cut across the strip where the fat middle ends.
@@ -351,7 +361,7 @@ public final class TeleLayout {
         // Top-left pocket, along the rising slope: the active OpenHaldex preset, its mode above it,
         // and a Wi-Fi warning only while the link is slow or lost.
         boolean slow = link && rateHz >= 0 && rateHz < 10;
-        double ps = l0 * 0.08;
+        double ps = l0 * 0.30; // tele5 photo: at 0.08 the name ran off the left edge
         slopeText(ps, half(ps) + 44 + 0.82 * 32, 32, true, LEFT, link ? PRESET : GREY, presetName(), true);
         slopeText(ps + 30, half(ps) + 86 + 0.82 * 18, 18, true, LEFT, GREY, presetMode(), true);
         slopeIcon(l0 * 0.70, half(l0 * 0.70) + 48, 28, TeleIcons.WIFI, AMBER, !link || slow);
@@ -408,17 +418,21 @@ public final class TeleLayout {
         boolean boosting = link && kpa > 0;
         int acx = 968;
         int acy = 328;
-        int segs = 22;
+        // tele7: one continuous coloured ring (fixed pieces that never change) and a cover in the
+        // track colour, two quarter rings turned to the boost, so the arc sweeps smoothly. Below
+        // the centre line a black block hides the cover's lower half.
+        int segs = 60;
         for (int i = 0; i < segs; i++) {
-            int v0 = BOOST_MIN + (BOOST_MAX - BOOST_MIN) * i / segs;
-            int v1 = BOOST_MIN + (BOOST_MAX - BOOST_MIN) * (i + 1) / segs;
-            double a0 = 180 - 180.0 * i / segs;
-            double a1 = 180 - 180.0 * (i + 1) / segs + 2.2;
-            boolean lit = link && (v1 <= 0 ? kpa < v1 : kpa > v0 && v0 >= 0);
-            int c = !lit ? TRACK : v1 <= 0 ? VAC_FILL : boostColour(v0);
-            arcSeg(acx, acy, 104, 120, a0, a1, (c & 0xFFFFFF00) | 0x48, lit && v0 >= 0);
-            arcSeg(acx, acy, 84, 112, a0, a1, c, true);
+            double a0 = 180 - 180.0 * i / segs + 0.5;
+            double a1 = 180 - 180.0 * (i + 1) / segs - 0.5;
+            int v = BOOST_MIN + (BOOST_MAX - BOOST_MIN) * (2 * i + 1) / (2 * segs);
+            arcSeg(acx, acy, 84, 112, a0, a1, v < 0 ? VAC_FILL : boostColour(v), true);
         }
+        double frac = link ? clamp(kpa - BOOST_MIN, 0, BOOST_MAX - BOOST_MIN) / (double) (BOOST_MAX - BOOST_MIN) : 0;
+        double phi = 180 + 180 * frac; // clockwise screen degrees from the right, where the fill ends
+        coverQuarter(acx, acy, phi);
+        coverQuarter(acx, acy, phi + 90);
+        box(acx - 122, acy + 1, 244, 126, BG, true);
         double az = 180 - 180.0 * (0 - BOOST_MIN) / (BOOST_MAX - BOOST_MIN);
         arcSeg(acx, acy, 78, 118, az + 0.8, az - 0.8, WHITE, true);
         // Peak marker: one fixed mark per segment, the one holding the peak shows.
@@ -450,6 +464,13 @@ public final class TeleLayout {
         if (kpa < 60)
             return mix(AMBER, BOOST_FILL, kpa / 60f);
         return mix(BOOST_FILL, RED, (kpa - 60) / 60f);
+    }
+
+    /** The boost arc's cover: a quarter ring in the track colour turned clockwise by deg. */
+    private void coverQuarter(int cx, int cy, double deg) {
+        int i = add(ICON, cx, cy, 116, 116, TRACK, true);
+        size[i] = TeleIcons.ARCQ;
+        rot[i] = (float) deg;
     }
 
     /** Ring segment around (cx, cy) between angles a0 and a1 (degrees, 0 = right, counter-clockwise). */
@@ -590,39 +611,42 @@ public final class TeleLayout {
         boolean over = link && rpm >= shiftRpm;
         boolean limit = link && rpm >= limitRpm;
         int vc = link ? WHITE : GREY;
-        int x0 = 24;
-        int x1 = 492;
-
-        text(210, 72, 28, true, LEFT, link ? PRESET : GREY, presetName(), true);
-        text(x1, 80, 16, true, RIGHT, GREY, presetMode(), true);
-        boolean slow = link && rateHz >= 0 && rateHz < 10;
-        icon(170, 76, 24, TeleIcons.WIFI, AMBER, !link || slow);
+        // tele5 photo: values at x 492 ran under the rev counter's ring, the preset row at y 72 was
+        // under the stock status line, and the strip's icon at x 24 under the frame.
+        int x0 = 52;
+        int x1 = 432;
 
         // Haldex lock: icon, strip with the target tick, percent.
         int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
         int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
-        icon(x0, 112, 28, TeleIcons.AWD, ICONC, true);
-        bar(x0 + 40, 118, 330, 16, act, 0, link ? HALDEX : GREY, -1);
-        box(x0 + 40 + 330 * tgt / 100 - 2, 113, 4, 26, WHITE, ok(CH_HX_TARGET));
-        text(x1, 110, 30, true, RIGHT, vc, ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
+        icon(x0, 118, 28, TeleIcons.AWD, ICONC, true);
+        bar(x0 + 40, 124, 240, 16, act, 0, link ? HALDEX : GREY, -1);
+        box(x0 + 40 + 240 * tgt / 100 - 2, 119, 4, 26, WHITE, ok(CH_HX_TARGET));
+        text(x1, 116, 30, true, RIGHT, vc, ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
+
+        // Preset and mode under the gear; Wi-Fi warning beside them while the link is slow or lost.
+        text(x0, 336, 26, true, LEFT, link ? PRESET : GREY, presetName(), true);
+        text(x0 + 2, 364, 14, true, LEFT, GREY, presetMode(), true);
+        boolean slow = link && rateHz >= 0 && rateHz < 10;
+        icon(200, 340, 22, TeleIcons.WIFI, AMBER, !link || slow);
 
         // Gear, red past the shift point, flashing at the limiter; temperatures beside it.
         int gc = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
-        gearGlyph(128, 168, 150, gc);
-        text(128, 336, 24, true, CENTER, AMBER, "NO LINK", !link);
-        box(256, 156, 2, 200, LINE, true);
+        gearGlyph(128, 160, 150, gc);
+        text(128, 310, 22, true, CENTER, AMBER, "NO LINK", !link);
+        box(244, 158, 2, 210, LINE, true);
         for (int t = 0; t < T_CH.length; t++)
-            tempCell(t, 276, x1, 154 + t * 42, 30, 30, rpm);
+            tempCell(t, 262, x1, 158 + t * 42, 30, 30, rpm);
 
         // Boost: icon, strip from vacuum to boost with zero marked, value in bar.
         int kpa = ok(CH_BOOST) ? r(val[CH_BOOST]) : 0;
         boolean boosting = link && kpa > 0;
         int zero = (0 - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN);
         int pos = clamp((kpa - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN), 0, 100);
-        icon(x0, 386, 28, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
-        bar(x0 + 40, 392, 300, 18, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
-        text(x1 - 40, 384, 30, true, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
-        text(x1, 396, 13, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
+        icon(x0, 396, 28, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
+        bar(x0 + 40, 402, 240, 18, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
+        text(x1 - 34, 394, 30, true, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
+        text(x1, 406, 13, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
     }
 
     /** One temperature: icon at x0, value right-aligned at x1, coloured by level. */
