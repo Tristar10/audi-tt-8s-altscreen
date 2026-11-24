@@ -1,10 +1,10 @@
 package local.tt;
 
 /**
- * Haldex control page (tele17, wiki/Telemetry.md): presets, mode and a manual lock slider, driven
- * by a few actions (steering-wheel keys through TeleKeys, the kit's `tele ui ...`, the simulator's
- * keys). One cursor runs over the presets, then MODE, then LOCK. Press on a preset applies it; on
- * MODE or LOCK it starts editing (roll changes the value, press sends, back cancels). Every
+ * Haldex control pop-up (tele18, wiki/Telemetry.md): a card over the view with three rows, PRESET,
+ * MODE and LOCK, driven by a few actions (steering-wheel keys through TeleKeys, the kit's `tele ui
+ * ...`, the simulator's keys). Roll moves between the rows; press starts editing the row (roll
+ * changes the value, press sends, back cancels); back closes; 20 s untouched closes it. Every
  * command is sent once and confirmed by the live stream (channel 22 preset, 12 mode, 23 lock
  * setpoint), not by the reply alone; refusals from the board are shown in words.
  * Board contract: OpenHaldex v1.1.21 docs/PRESETS.md. Shared by the head unit and the simulator.
@@ -29,9 +29,14 @@ public final class TeleUi {
     private static final int[] QUEUE = new int[16];
     private static int qn;
 
+    public static final int ROW_PRESET = 0;
+    public static final int ROW_MODE = 1;
+    public static final int ROW_LOCK = 2;
+
     private boolean open;
     private int cursor;
     private boolean edit;
+    private int editPreset;
     private int editMode = MODE_MAP;
     private int editLock = 30;
     private int pendKind; // 0 none, 1 preset, 2 mode, 3 lock
@@ -82,11 +87,11 @@ public final class TeleUi {
             open = false;
             edit = false;
         }
-        int items = t.catN + 2;
-        if (cursor >= items) {
-            cursor = items - 1;
+        if (editPreset >= t.catN) {
+            editPreset = Math.max(0, t.catN - 1);
         }
         t.uiOpen = open;
+        t.uiPreset = editPreset;
         t.uiCursor = cursor;
         t.uiEdit = edit;
         t.uiMode = editMode;
@@ -98,13 +103,10 @@ public final class TeleUi {
 
     private void handle(TeleLayout t, int act, long now) {
         lastInput = now;
-        int items = t.catN + 2;
         if (act == OPEN) {
             open = !open;
             edit = false;
-            if (open) {
-                cursor = Math.max(0, activeIndex(t));
-            }
+            cursor = ROW_PRESET;
             return;
         }
         if (act == CLOSE) {
@@ -115,16 +117,18 @@ public final class TeleUi {
         if (!open) {
             return;
         }
-        int modeItem = t.catN;
-        int lockItem = t.catN + 1;
         if (act == UP || act == DOWN) {
             int d = act == DOWN ? 1 : -1;
-            if (edit && cursor == modeItem) {
+            if (!edit) {
+                cursor = Math.max(ROW_PRESET, Math.min(ROW_LOCK, cursor + d));
+            } else if (cursor == ROW_PRESET) {
+                if (t.catN > 0) {
+                    editPreset = (editPreset + d + t.catN) % t.catN;
+                }
+            } else if (cursor == ROW_MODE) {
                 editMode = (editMode + d + MODE_COUNT) % MODE_COUNT;
-            } else if (edit && cursor == lockItem) {
-                editLock = Math.max(0, Math.min(100, editLock + d * LOCK_STEP));
             } else {
-                cursor = Math.max(0, Math.min(items - 1, cursor + d));
+                editLock = Math.max(0, Math.min(100, editLock + d * LOCK_STEP));
             }
         } else if (act == BACK) {
             if (edit) {
@@ -133,18 +137,25 @@ public final class TeleUi {
                 open = false;
             }
         } else if (act == PRESS) {
-            if (cursor < t.catN) {
-                send(t, TeleLink.CMD_APPLY, t.catId[cursor], 1, now, new StringBuffer("PRESET ")
-                    .append(t.catName[cursor] == null ? "?" : t.catName[cursor].toUpperCase()).toString());
-            } else if (!edit) {
+            if (!edit) {
+                // start editing from what the board holds now
+                if (cursor == ROW_PRESET && t.catN == 0) {
+                    say("NO PRESET LIST YET", TeleLayout.AMBER, now);
+                    return;
+                }
                 edit = true;
-                int m = t.has[TeleLayout.CH_MODE] ? (t.val[TeleLayout.CH_MODE] + 500) / 1000 : MODE_MAP;
-                int l = t.has[TeleLayout.CH_LOCK_SET] ? (t.val[TeleLayout.CH_LOCK_SET] + 500) / 1000 : 255;
+                editPreset = Math.max(0, activeIndex(t));
+                int m = chan(t, TeleLayout.CH_MODE);
                 editMode = m >= 0 && m < MODE_COUNT ? m : MODE_MAP;
+                int l = chan(t, TeleLayout.CH_LOCK_SET);
                 editLock = l >= 0 && l <= 100 ? l - l % LOCK_STEP : editLock;
             } else {
                 edit = false;
-                if (cursor == modeItem) {
+                if (cursor == ROW_PRESET) {
+                    String nm = t.catName[editPreset];
+                    send(t, TeleLink.CMD_APPLY, t.catId[editPreset], 1, now, new StringBuffer("PRESET ")
+                        .append(nm == null ? "?" : nm.toUpperCase()).toString());
+                } else if (cursor == ROW_MODE) {
                     send(t, TeleLink.CMD_MODE, editMode, 2, now,
                         new StringBuffer("MODE ").append(TeleLayout.modeName(editMode)).toString());
                 } else {
@@ -208,7 +219,7 @@ public final class TeleUi {
                 return i;
             }
         }
-        return t.catN > 0 ? 0 : t.catN;
+        return 0;
     }
 
     private static String refusal(int r) {

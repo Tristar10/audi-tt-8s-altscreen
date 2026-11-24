@@ -467,6 +467,15 @@ autozoom)
            exit 2;;
     esac
     ;;
+shot)
+    # A screenshot of the cockpit as the head unit draws it (tt-zoom tele18): the head unit writes
+    # the PNG itself, through the same call as its own key-combo screenshot. Copy it off with scp.
+    f=/tmp/tt-shot-$(date +%H%M%S 2>/dev/null || echo 0).png
+    echo "$f" > /tmp/tt-shot
+    say "Screenshot requested ($f); waiting..."
+    n=0; while test $n -lt 10 && ! test -s "$f"; do sleep 1; n=$((n+1)); done
+    if test -s "$f"; then say "Saved $f ($(ls -l "$f" | awk '{print $5}') bytes)."; else say 'No file yet: grep "tt shot" /tmp/tt-rgd.log'; fi
+    ;;
 tele)
     # The view's receiver needs UDP 49160. ttlink (the link-test tool) binds the same port; only one
     # can hold it, so the view stops a running ttlink. Nothing else is touched.
@@ -475,7 +484,7 @@ tele)
             slay -f ttlink 2>/dev/null; say 'Stopped ttlink (it held UDP 49160, which the view needs).'
         fi
     }
-    # OpenHaldex autocross view (tt-zoom tele17, wiki Telemetry.md): our own full-screen picture over
+    # OpenHaldex autocross view (tt-zoom tele18, wiki Telemetry.md): our own full-screen picture over
     # the map tab (Classic) or the small view's map area (Sport). RAM switches, read within 1 s;
     # "boot" writes the one flash default.
     case "${2:-}" in

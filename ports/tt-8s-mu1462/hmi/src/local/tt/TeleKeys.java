@@ -87,6 +87,10 @@ final class TeleKeys extends BaseJobFilter {
             if (id == KeyEvent.KEY_PRESSED && toggleCode >= 0 && k.getKeyCode() == toggleCode) {
                 TeleView.press();
             }
+            // tele18: a long press of the same key opens or closes the Haldex pop-up
+            if (id == KeyEvent.KEY_LONG_PRESSED && toggleCode >= 0 && k.getKeyCode() == toggleCode) {
+                TeleUi.post(TeleUi.OPEN);
+            }
             int[][] km = keymap;
             for (int i = 0; i < km.length; i++) {
                 if (km[i][0] == k.getKeyCode() && km[i][1] == id) {

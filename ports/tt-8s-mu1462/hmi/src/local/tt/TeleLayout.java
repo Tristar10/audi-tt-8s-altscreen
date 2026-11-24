@@ -190,6 +190,7 @@ public final class TeleLayout {
     // Haldex control page (TeleUi, tele17): written by TeleUi.tick before build.
     public boolean uiOpen;
     public int uiCursor;
+    public int uiPreset;
     public boolean uiEdit;
     public int uiMode;
     public int uiLock;
@@ -238,6 +239,8 @@ public final class TeleLayout {
             liveLarge();
         else
             liveSmall();
+        if (uiOpen && page == PAGE_LIVE)
+            popup(large);
     }
 
     private void liveLarge() {
@@ -447,10 +450,6 @@ public final class TeleLayout {
         slopeText(ba + 50, half(ba + 50) + 56 + 0.82 * 40, 40, false, LEFT, vc,
             ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
 
-        if (uiOpen) {
-            controlLarge();
-            return;
-        }
         // Left of the notch: rpm, and the driver's inputs under it: accelerator (green) and brake
         // pressure (red, full bar at 100 bar).
         icon(GRID_X0 + 14, 210 + D_Y, 32, TeleIcons.TACH, ICONC, true);
@@ -527,7 +526,6 @@ public final class TeleLayout {
         }
     }
 
-    /** Boost colour for a segment starting at kpa: amber at zero, through orange, red from 1.2 bar. */
     /** Boost scheme: ice at zero, sakura at 0.9 bar, red at full boost. */
     private static int boostColour(int kpa) {
         if (kpa <= 0)
@@ -537,29 +535,8 @@ public final class TeleLayout {
         return mix(SAKURA, RED, Math.min(1f, (kpa - 90) / 60f));
     }
 
-    private static int boostColourOld(int kpa) {
-        if (kpa >= 120)
-            return RED;
-        if (kpa < 60)
-            return mix(AMBER, BOOST_FILL, kpa / 60f);
-        return mix(BOOST_FILL, RED, (kpa - 60) / 60f);
-    }
 
-    /** The boost arc's cover: a quarter ring in the track colour turned clockwise by deg. */
-    private void coverQuarter(int cx, int cy, double deg) {
-        int i = add(ICON, cx, cy, 116, 116, BG, true);
-        size[i] = TeleIcons.ARCQ;
-        rot[i] = (float) deg;
-    }
 
-    /** Ring segment around (cx, cy) between angles a0 and a1 (degrees, 0 = right, counter-clockwise). */
-    private void arcSeg(int cx, int cy, int rIn, int rOut, double a0, double a1, int c, boolean v) {
-        double r0 = Math.toRadians(a0);
-        double r1 = Math.toRadians(a1);
-        quad(cx + rd(Math.cos(r0) * rOut), cy - rd(Math.sin(r0) * rOut), cx + rd(Math.cos(r1) * rOut),
-            cy - rd(Math.sin(r1) * rOut), cx + rd(Math.cos(r1) * rIn), cy - rd(Math.sin(r1) * rIn),
-            cx + rd(Math.cos(r0) * rIn), cy - rd(Math.sin(r0) * rIn), c, v);
-    }
 
     /** The lit strip's one colour at this rpm, in four steps (few node colours on the car). */
     private int stripColourAt(int rpmNow) {
@@ -579,13 +556,6 @@ public final class TeleLayout {
         return mix(ICE, SAKURA, Math.min(1f, (rpmAt - from) / 2500f));
     }
 
-    /** Lit strip colour at rpm: cool white, warming to amber over the last 1500 rpm before shift. */
-    private int stripColour(int rpmAt) {
-        int from = shiftRpm - 1500;
-        if (rpmAt <= from)
-            return STRIP_LO;
-        return mix(STRIP_LO, AMBER, Math.min(1f, (rpmAt - from) / 1500f));
-    }
 
     static int mix(int a, int b, float t) {
         int out = 0;
@@ -680,15 +650,6 @@ public final class TeleLayout {
         return Math.sqrt(sq(TP_X[k + 1] - TP_X[k]) + sq(TP_Y[k + 1] - TP_Y[k]));
     }
 
-    private String linkText() {
-        if (!link)
-            return "NO LINK";
-        if (rateHz < 0)
-            return "OK";
-        StringBuffer sb = new StringBuffer();
-        sb.append(rateHz).append(" Hz");
-        return sb.toString();
-    }
 
     /**
      * The Sport view's panel outline, tracing what the cluster lets through (user 2026-11-24): the
@@ -774,35 +735,30 @@ public final class TeleLayout {
         int gc = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
         gearGlyph(112, 182, 170, gc);
         text(112, 342, 22, true, CENTER, AMBER, "NO LINK", !link);
-        if (uiOpen) {
-            controlSmall();
-        } else {
-            box(222, 184, 2, 196, LINE, true);
-            int row = 0;
-            for (int t = 0; t < T_CH.length; t++) {
-                if (T_CH[t] == CH_OIL)
-                    continue; // the stock Sport view shows oil temperature
-                tempCell(t, 240, x1, 184 + row * 50, 34, 36, rpm);
-                row++;
-            }
-
-            // Preset and mode under the gear; Wi-Fi warning beside them while the link is slow or lost.
-            text(x0, 370, 28, false, LEFT, link ? PRESET : GREY, presetName(), true);
-            text(x0 + 2, 400, 15, true, LEFT, GREY, presetMode(), true);
-            boolean slow = link && rateHz >= 0 && rateHz < 10;
-            icon(190, 372, 22, TeleIcons.WIFI, AMBER, !link || slow);
-
-            // Boost: icon, strip from vacuum to boost with zero marked, value in bar.
-            int kpa = ok(CH_BOOST) ? r(val[CH_BOOST]) : 0;
-            boolean boosting = link && kpa > 0;
-            int zero = (0 - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN);
-            int pos = clamp((kpa - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN), 0, 100);
-            icon(x0, 424, 30, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
-            bar(x0 + 44, 434, 250, 10, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
-            text(x1 - 36, 420, 34, false, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
-            text(x1, 434, 14, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
-
+        box(222, 184, 2, 196, LINE, true);
+        int row = 0;
+        for (int t = 0; t < T_CH.length; t++) {
+            if (T_CH[t] == CH_OIL)
+                continue; // the stock Sport view shows oil temperature
+            tempCell(t, 240, x1, 184 + row * 50, 34, 36, rpm);
+            row++;
         }
+
+        // Preset and mode under the gear; Wi-Fi warning beside them while the link is slow or lost.
+        text(x0, 370, 28, false, LEFT, link ? PRESET : GREY, presetName(), true);
+        text(x0 + 2, 400, 15, true, LEFT, GREY, presetMode(), true);
+        boolean slow = link && rateHz >= 0 && rateHz < 10;
+        icon(190, 372, 22, TeleIcons.WIFI, AMBER, !link || slow);
+
+        // Boost: icon, strip from vacuum to boost with zero marked, value in bar.
+        int kpa = ok(CH_BOOST) ? r(val[CH_BOOST]) : 0;
+        boolean boosting = link && kpa > 0;
+        int zero = (0 - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN);
+        int pos = clamp((kpa - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN), 0, 100);
+        icon(x0, 424, 30, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
+        bar(x0 + 44, 434, 250, 10, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
+        text(x1 - 36, 420, 34, false, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
+        text(x1, 434, 14, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
 
         // Redline warning frame on top: a thick red line along the panel outline with a glow,
         // flashing with the shift lights.
@@ -849,15 +805,6 @@ public final class TeleLayout {
         text(x1, yy + (is - vs) / 2, vs, false, RIGHT, c, v, true);
     }
 
-    /** Haldex lock bar with target tick at (x0, y0); actual percent right-aligned at (rx, ry). */
-    private void hxBar(int x0, int y0, int bw, int bh, int rx, int ry, int ps) {
-        int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
-        int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
-        box(x0, y0, bw, bh, DIM, true);
-        box(x0, y0, bw * act / 100, bh, link ? HALDEX : GREY, act > 0);
-        box(x0 + bw * tgt / 100 - 2, y0 - 4, 4, bh + 8, WHITE, ok(CH_HX_TARGET));
-        text(rx, ry, ps, true, RIGHT, link ? WHITE : GREY, ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
-    }
 
     private void presets(boolean large) {
         // A panel where the map was: large view between the dials, small view left of the rev counter.
@@ -1006,91 +953,69 @@ public final class TeleLayout {
     }
 
     /**
-     * Haldex control page, Classic (TeleUi): presets on the left of the gear, mode and the lock
-     * slider on the right, the status or a hint in the temperature row. Gear, strip and shift lights
-     * stay.
+     * The Haldex control pop-up (TeleUi, tele18): the view dimmed, a glass card with three rows
+     * (PRESET, MODE, LOCK), the focused row lit; while editing, the value between arrows in sakura;
+     * the board's answer or a hint along the bottom. Classic: centred on the gear; Sport: over the
+     * panel.
      */
-    private void controlLarge() {
-        int active = ok(CH_PRESET) ? r(val[CH_PRESET]) : -1;
-        int modeNow = ok(CH_MODE) ? r(val[CH_MODE]) : -1;
-        int lockNow = ok(CH_LOCK_SET) ? r(val[CH_LOCK_SET]) : 255;
-        // presets
-        text(352, 232, 14, true, LEFT, GREY, "PRESETS", true);
-        int rows = 4;
-        int first = Math.max(0, Math.min(catN - rows, uiCursor - 1));
-        if (uiCursor >= catN)
-            first = Math.max(0, catN - rows);
-        for (int k = 0; k < rows; k++) {
-            int i = first + k;
-            boolean on = i < catN;
-            int y0 = 252 + k * 31;
-            box(344, y0, 244, 28, CURSOR, on && uiCursor == i);
-            box(348, y0 + 6, 4, 16, ACTIVE, on && link && catId[i] == active);
-            text(360, y0 + 3, 22, uiCursor == i, LEFT, on && catId[i] == active ? WHITE : ICONC,
-                on ? upper(catName[i]) : null, on);
-            text(584, y0 + 8, 12, false, RIGHT, GREY, on ? mode(catMode[i]) : null, on);
-        }
-        text(466, 290, 18, true, CENTER, link ? GREY : AMBER, link ? "NO PRESETS YET" : "NO LINK", catN == 0);
-        // mode
-        boolean mFocus = uiCursor == catN;
-        boolean lFocus = uiCursor == catN + 1;
-        text(862, 232, 14, true, LEFT, GREY, "MODE", true);
-        box(856, 250, 244, 40, CURSOR, mFocus);
-        String mv = mFocus && uiEdit ? new StringBuffer("< ").append(mode(uiMode)).append(" >").toString()
-            : modeNow >= 0 ? mode(modeNow) : "-";
-        text(978, 256, 28, true, CENTER, mFocus && uiEdit ? SAKURA : link ? WHITE : GREY, mv, true);
-        // lock slider: 0..100 % in 10 % steps; shows the setpoint in MANUAL, the edit value while editing
-        text(862, 300, 14, true, LEFT, GREY, "LOCK", true);
-        box(856, 316, 244, 48, CURSOR, lFocus);
-        int lv = lFocus && uiEdit ? uiLock : lockNow <= 100 ? lockNow : -1;
-        box(866, 334, 160, 12, DIM, true);
-        box(866, 334, lv > 0 ? 160 * lv / 100 : 0, 12, lFocus && uiEdit ? SAKURA : HALDEX, lv > 0);
-        for (int t = 1; t < 10; t++)
-            box(866 + 16 * t, 331, 1, 18, BG, true);
-        text(1094, 324, 26, true, RIGHT, lFocus && uiEdit ? SAKURA : link ? WHITE : GREY,
-            lv >= 0 ? percent(lv) : "OFF", true);
-        // status or hint
-        String hint = uiEdit ? "ROLL TO CHANGE  -  PRESS TO SEND  -  BACK TO CANCEL"
-            : "ROLL TO CHOOSE  -  PRESS TO SELECT  -  BACK TO CLOSE";
-        text(720, GRID_Y + 4, 20, uiMsg != null, CENTER, uiMsg != null ? uiMsgRgba : GREY, uiMsg != null ? uiMsg : hint, true);
-    }
+    private void popup(boolean large) {
+        int cx = large ? 720 : 226;
+        int x0 = large ? 470 : 22;
+        int x1 = large ? 970 : 430;
+        int y0 = large ? 112 : 108;
+        int rowH = large ? 74 : 82;
+        box(0, 0, SCREEN_W, SCREEN_H, 0x000000B0, true); // dim the view
+        box(x0, y0, x1 - x0, 46 + 3 * rowH + 40, 0x08102AF2, true);
+        box(x0, y0, x1 - x0, 2, 0x2FD4FFFF, true);
+        box(x0, y0 + 46 + 3 * rowH + 38, x1 - x0, 2, 0x2FD4FFFF, true);
+        box(x0, y0, 2, 46 + 3 * rowH + 40, 0x3E8BFFFF, true);
+        box(x1 - 2, y0, 2, 46 + 3 * rowH + 40, 0x3E8BFFFF, true);
+        box(x0 + 2, y0 + 2, 60, 4, 0xFF5FA8FF, true); // the characters' colours as accents
+        box(x1 - 62, y0 + 2, 60, 4, 0x2FD4FFFF, true);
+        text(x0 + 18, y0 + 14, 16, true, LEFT, GREY, "OPENHALDEX", true);
+        text(x1 - 18, y0 + 16, 13, false, RIGHT, link ? GREY : AMBER, link ? "LINKED" : "NO LINK", true);
 
-    /** Haldex control page, Sport: in the temperature column and the rows under the gear. */
-    private void controlSmall() {
         int active = ok(CH_PRESET) ? r(val[CH_PRESET]) : -1;
         int modeNow = ok(CH_MODE) ? r(val[CH_MODE]) : -1;
         int lockNow = ok(CH_LOCK_SET) ? r(val[CH_LOCK_SET]) : 255;
-        int x0 = 236;
-        int x1 = 420;
-        int rows = 3;
-        int first = Math.max(0, Math.min(catN - rows, uiCursor - 1));
-        if (uiCursor >= catN)
-            first = Math.max(0, catN - rows);
-        for (int k = 0; k < rows; k++) {
-            int i = first + k;
-            boolean on = i < catN;
-            int y0 = 184 + k * 34;
-            box(x0, y0, x1 - x0, 30, CURSOR, on && uiCursor == i);
-            box(x0 + 4, y0 + 7, 4, 16, ACTIVE, on && link && catId[i] == active);
-            text(x0 + 14, y0 + 4, 22, uiCursor == i, LEFT, on && catId[i] == active ? WHITE : ICONC,
-                on ? upper(catName[i]) : null, on);
+        String activeName = "NONE";
+        for (int i = 0; i < catN; i++)
+            if (catId[i] == active)
+                activeName = upper(catName[i]);
+        String[] label = {"PRESET", "MODE", "LOCK"};
+        for (int row = 0; row < 3; row++) {
+            int ry = y0 + 46 + row * rowH;
+            boolean focus = uiCursor == row;
+            boolean ed = focus && uiEdit;
+            box(x0 + 10, ry + 4, x1 - x0 - 20, rowH - 8, ed ? 0x3A1430FF : CURSOR, focus);
+            box(x0 + 10, ry + 4, 4, rowH - 8, ed ? SAKURA : 0x2FD4FFFF, focus);
+            text(x0 + 24, ry + 10, 13, true, LEFT, focus ? WHITE : GREY, label[row], true);
+            String v;
+            if (row == 0)
+                v = ed ? (uiPreset < catN ? upper(catName[uiPreset]) : "-") : link ? activeName : "-";
+            else if (row == 1)
+                v = ed ? mode(uiMode) : modeNow >= 0 ? mode(modeNow) : "-";
+            else
+                v = ed ? percent(uiLock) : lockNow <= 100 ? percent(lockNow) : "OFF";
+            int vs = large ? 32 : 28;
+            int vy = ry + (row == 2 ? 14 : 22);
+            text(cx, vy, vs, true, CENTER, ed ? SAKURA : link ? WHITE : GREY, v, true);
+            text(x0 + 40, vy + 2, vs - 4, true, CENTER, SAKURA, "<", ed);
+            text(x1 - 40, vy + 2, vs - 4, true, CENTER, SAKURA, ">", ed);
+            if (row == 2) {
+                int lv = ed ? uiLock : lockNow <= 100 ? lockNow : 0;
+                int bx = cx - (large ? 140 : 110);
+                int bw = large ? 280 : 220;
+                box(bx, ry + rowH - 22, bw, 10, DIM, true);
+                box(bx, ry + rowH - 22, bw * lv / 100, 10, ed ? SAKURA : HALDEX, lv > 0);
+                for (int t = 1; t < 10; t++)
+                    box(bx + bw * t / 10, ry + rowH - 24, 1, 14, 0x08102AFF, true);
+            }
         }
-        boolean mFocus = uiCursor == catN;
-        boolean lFocus = uiCursor == catN + 1;
-        box(x0, 290, x1 - x0, 34, CURSOR, mFocus);
-        text(x0 + 6, 300, 13, true, LEFT, GREY, "MODE", true);
-        String mv = mFocus && uiEdit ? new StringBuffer("< ").append(mode(uiMode)).append(" >").toString()
-            : modeNow >= 0 ? mode(modeNow) : "-";
-        text(x1 - 6, 294, 24, true, RIGHT, mFocus && uiEdit ? SAKURA : link ? WHITE : GREY, mv, true);
-        box(x0, 330, x1 - x0, 40, CURSOR, lFocus);
-        text(x0 + 6, 336, 13, true, LEFT, GREY, "LOCK", true);
-        int lv = lFocus && uiEdit ? uiLock : lockNow <= 100 ? lockNow : -1;
-        box(x0 + 6, 356, 110, 8, DIM, true);
-        box(x0 + 6, 356, lv > 0 ? 110 * lv / 100 : 0, 8, lFocus && uiEdit ? SAKURA : HALDEX, lv > 0);
-        text(x1 - 6, 334, 24, true, RIGHT, lFocus && uiEdit ? SAKURA : link ? WHITE : GREY,
-            lv >= 0 ? percent(lv) : "OFF", true);
-        String hint = uiEdit ? "ROLL: CHANGE  PRESS: SEND" : "ROLL: CHOOSE  PRESS: SELECT";
-        text(32, 400, 16, uiMsg != null, LEFT, uiMsg != null ? uiMsgRgba : GREY, uiMsg != null ? uiMsg : hint, true);
+        int hy = y0 + 46 + 3 * rowH + 10;
+        String hint = uiEdit ? "ROLL: CHANGE   PRESS: SEND   BACK: CANCEL" : "ROLL: ROW   PRESS: EDIT   BACK: CLOSE";
+        text(cx, hy, large ? 16 : 13, uiMsg != null, CENTER, uiMsg != null ? uiMsgRgba : GREY,
+            uiMsg != null ? uiMsg : hint, true);
     }
 
     private static String mode(int m) {
@@ -1113,7 +1038,15 @@ public final class TeleLayout {
         return v < lo ? lo : v > hi ? hi : v;
     }
 
+    /** True once a build asked for more than MAX slots (the extra ones are dropped; TeleView logs it). */
+    public boolean overflow;
+
     private int add(int k, int x0, int y0, int w0, int h0, int c, boolean v) {
+        if (count >= MAX) {
+            overflow = true;
+            v = false;
+            count = MAX - 1; // reuse the last slot, hidden: never write past the arrays
+        }
         int i = count++;
         kind[i] = k;
         x[i] = x0;

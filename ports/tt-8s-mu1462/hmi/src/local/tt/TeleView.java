@@ -45,6 +45,9 @@ import de.esolutions.hmi.widgets.audi.base.eal.TextureDescription;
  *                        see-through gear notch
  *   /tmp/tt-tele-ui      tele17: one control-page action (open, up, down, press, back, close),
  *                        read every tick and deleted (TeleUi)
+ *   /tmp/tt-shot         tele18: a screenshot of the cockpit, written by the head unit itself as a
+ *                        PNG to the path in the file (HMIService.takeScreenshot, the stock key-combo
+ *                        screenshot's call), then the file is deleted
  *   /tmp/tt-tele-glide   tele17: glide between data updates (or /mnt/app/root/tt/tele-glide); TeleGlide
  *   /tmp/tt-tele-probe   tele8 probe instead of the view: the painted rev strip (TeleStrip), the
  *                        lit picture cut by a clip rectangle at the rpm. "grp" (default): the clip
@@ -78,7 +81,9 @@ public final class TeleView implements Runnable {
     private static volatile boolean glide;
     private static final TeleGlide GLIDE = new TeleGlide();
     private static final File UI_FILE = new File("/tmp/tt-tele-ui");
+    private static final File SHOT_FILE = new File("/tmp/tt-shot");
     private static final TeleUi UI = new TeleUi();
+    private static boolean overflowNoted;
     private static final File BEEP_FILE = new File("/tmp/tt-tele-beep");
     private static final File SHIFTBEEP_FILE = new File("/tmp/tt-tele-shiftbeep");
     private static volatile String shiftBeep;
@@ -234,7 +239,12 @@ public final class TeleView implements Runnable {
                         int view = small ? TeleLayout.VIEW_SMALL : TeleLayout.VIEW_LARGE;
                         int theme = themeOn && themeLoaded(view) ? view : -1;
                         layout.themed = theme >= 0;
+                        layout.overflow = false;
                         layout.build(view, TeleLayout.PAGE_LIVE);
+                        if (layout.overflow && !overflowNoted) {
+                            overflowNoted = true;
+                            RgdBus.note("tele layout: more than 400 slots, the extra ones are dropped");
+                        }
                         f = TeleFrame.of(layout, (small ? 1 : 0) | (UI.isOpen() ? 2 : 0) | (rotGen << 4));
                         f.theme = theme;
                         prepareArt(f);
@@ -986,6 +996,11 @@ public final class TeleView implements Runnable {
         demo = DEMO_FILE.exists();
         TeleKeys.install();
         TeleKeys.readSwitches();
+        String sp = readLine(SHOT_FILE);
+        if (sp != null) {
+            SHOT_FILE.delete();
+            RgdBus.note(shot(sp.length() > 0 ? sp : "/tmp/tt-shot.png"));
+        }
         String bl = readLine(BEEP_FILE);
         if (bl != null) {
             BEEP_FILE.delete();
@@ -1037,6 +1052,20 @@ public final class TeleView implements Runnable {
             rotSign = sign;
             rotOff = off;
             rotGen = (rotGen + 1) & 0xFFF; // rebuild, so every node is placed again
+        }
+    }
+
+    /** A cockpit screenshot through the stock call (the head unit writes the PNG). */
+    private static String shot(String path) {
+        try {
+            EALManager m = TtPanel.ealManager();
+            if (m == null) {
+                return "tt shot: HMI not up yet";
+            }
+            m.getTerminal().getFramework().getHMIService().takeScreenshot(0, path);
+            return new StringBuffer("tt shot: requested ").append(path).toString();
+        } catch (Throwable t) {
+            return new StringBuffer("tt shot failed ").append(String.valueOf(t)).toString();
         }
     }
 

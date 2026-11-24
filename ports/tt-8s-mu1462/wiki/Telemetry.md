@@ -165,7 +165,22 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele17)
+## Autocross view on the head unit (tt-zoom tele18)
+
+User 2026-11-24: the Haldex control as a pop-up, not inside the panel. tele18:
+- **Pop-up card** over the dimmed view (Classic centred on the gear, Sport over the panel): three
+  rows PRESET, MODE, LOCK. Roll moves between rows; press edits the row (roll changes, press sends,
+  back cancels); back closes; 20 s untouched closes. Opened by a **long press** of the toggle key
+  (the double press still switches the view), or `sh tt.sh tele ui open`. Same commands and
+  confirmation as tele17 below.
+- **Screenshot**: `sh tt.sh shot` makes the head unit write a PNG of the cockpit itself
+  (`HMIService.takeScreenshot(0, path)`, the call its own key-combo screenshot uses) to
+  /tmp/tt-shot-HHMMSS.png; copy it off with scp. For exact stock positions and sharp sim backgrounds.
+- Cleanup: dead helpers removed (old boost arc and cover, hxBar, linkText, old strip colours); a
+  layout can no longer write past 400 slots (extra slots dropped, logged once).
+
+### Earlier: tele17
+
 
 **Haldex control page** (user 2026-11-24: presets, modes and a lock slider from the cockpit).
 TeleUi: one cursor over the presets, then MODE, then LOCK; press on a preset applies it, on MODE
