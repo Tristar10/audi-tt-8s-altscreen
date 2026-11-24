@@ -120,7 +120,9 @@ public final class TeleLayout {
     // leaving a pocket above each slope. The flat middle is the fattest part and ends exactly at the
     // shift point; the slopes taper. The scale is in three parts: the left slope up to MID_RPM, the
     // middle up to the shift point, the right slope from the shift point to barToRpm.
-    static final int[] TP_X = {24, 325, 1057, 1416};
+    // Middle corners at 720 - 2000 k and 720 + 1800 k (k = the middle's px per rpm): 5000 rpm sits
+    // on the screen's centre line x 720, with the gear, shift lights and panel (user 2026-11-24).
+    static final int[] TP_X = {24, 335, 1067, 1416};
     // User 2026-11-24: the flat middle fatter (68 px), lower so the shift lights above it can be
     // taller too; everything under the strip moved down by D_Y. The slopes taper from 28 px.
     static final int[] TP_Y = {266, 170, 170, 266};
@@ -140,8 +142,8 @@ public final class TeleLayout {
     private static final int NOTCH_SLOPE = 30;
     private static final int NOTCH_Y = 324 + D_Y;
     // Temperature row between the dials, under the notch.
-    private static final int GRID_X0 = 330;
-    private static final int GRID_X1 = 1090;
+    private static final int GRID_X0 = 340; // centred on x 720 (was 330..1090)
+    private static final int GRID_X1 = 1100;
     private static final int GRID_Y = 362 + D_Y;
 
     // Settings
@@ -315,6 +317,12 @@ public final class TeleLayout {
                 double e1 = k == SLOPE_PIECES - 1 ? 0 : 1.5; // overlap hides the joint
                 if (pass == 0) {
                     bandOff(s0, s1 + e1, -half(s0), half(s0), -half(s1 + e1), half(s1 + e1), track, true);
+                    // red zone: hazard stripes on the track, covered by the fill when lit
+                    for (double a = s0; k > SLOPE_PIECES && a < s1 - 2; a += 14) {
+                        double b = Math.min(s1, a + 6);
+                        double sl = 10;
+                        stripe(a, b, sl, 0x7A1A14FF);
+                    }
                     continue;
                 }
                 bandOff(s0, s1 + e1, -half(s0), half(s0), -half(s1 + e1), half(s1 + e1), fc, fillOn && frac >= 1);
@@ -327,13 +335,22 @@ public final class TeleLayout {
             }
         }
         // Shift point: a red cut across the strip where the fat middle ends.
-        bandOff(r0 - 1, r0 + 1, -HALF_MAX - 4, HALF_MAX + 4, -HALF_MAX - 4, HALF_MAX + 4, RED, true);
+        box(TP_X[2] - 1, TP_Y[2] - HALF_MAX - 4, 3, 2 * HALF_MAX + 8, RED, true); // vertical (user 2026-11-24)
         // Limiter range: red marks along the outer edge of the right slope.
         double sl = rpmToS(limitRpm);
         for (int i = 0; i < 5; i++) {
             double a = sl + (len - sl) * i / 5;
             double b = sl + (len - sl) * (i + 1) / 5 - 3;
             bandOff(a, b, half(a) + 3, half(a) + 5, half(b) + 3, half(b) + 5, RED, limitRpm < barToRpm);
+        }
+        for (int k = (barFromRpm + 999) / 1000; k * 1000 < barToRpm && !paintedStrip; k++) {
+            if (k == 0)
+                continue;
+            // vertical tick through the strip at each 1000 (user 2026-11-24: the one under 3 was missing)
+            tp(rpmToS(k * 1000), pa);
+            double hv = half(rpmToS(k * 1000)) / Math.max(0.5, -pa[3]);
+            boolean litT = link && rpm > k * 1000 && !(limit && !blink);
+            box(rd(pa[0]) - 1, rd(pa[1] - hv), 2, rd(2 * hv), litT ? 0x0B0F1499 : LINE, true);
         }
         for (int k = (barFromRpm + 999) / 1000; k * 1000 <= barToRpm; k++) {
             if (k == 0)
@@ -427,7 +444,7 @@ public final class TeleLayout {
         // FL5-thick (user 2026-11-24): 25 tall stripes of 10 kPa, 46 px high
         int segN = 25;
         int pitch = 9;
-        int bx = 864;
+        int bx = 874;
         int by = 278;
         int bh = 46;
         int bwAll = segN * pitch - 2;
@@ -758,6 +775,21 @@ public final class TeleLayout {
         tp(s1, pb);
         quad(rd(pa[0] + pa[2] * out0), rd(pa[1] + pa[3] * out0), rd(pb[0] + pb[2] * out1), rd(pb[1] + pb[3] * out1),
             rd(pb[0] + pb[2] * in1), rd(pb[1] + pb[3] * in1), rd(pa[0] + pa[2] * in0), rd(pa[1] + pa[3] * in0), c, v);
+    }
+
+    /** A hazard stripe across the strip: from s a..b at the inner edge, slanted by sl at the outer. */
+    private void stripe(double a, double b, double sl, int c) {
+        double ha = half(a);
+        double hb = half(b);
+        tp(a, pa);
+        double ax = pa[0], ay = pa[1], nx = pa[2], ny = pa[3];
+        tp(b, pb);
+        double bx = pb[0], by = pb[1];
+        double ux = (bx - ax) / Math.max(0.001, b - a);
+        double uy = (by - ay) / Math.max(0.001, b - a);
+        quad(rd(ax - nx * ha), rd(ay - ny * ha), rd(bx - nx * hb), rd(by - ny * hb),
+            rd(bx + ux * sl + nx * hb), rd(by + uy * sl + ny * hb), rd(ax + ux * sl + nx * ha), rd(ay + uy * sl + ny * ha),
+            c, true);
     }
 
     private static int rd(double d) {

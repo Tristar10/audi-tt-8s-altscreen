@@ -67,8 +67,8 @@ public final class TeleStrip {
         int nt = 0;
         for (int k = Math.max(1, kFrom); k <= kTo; k++) {
             double s = t.rpmToS(k * 1000);
-            // none on a corner (the round join would make it a wedge) or at the very end
-            if (Math.abs(s - sl[0]) > 4 && Math.abs(s - sl[0] - sl[1]) > 4 && s < acc - 4) {
+            // vertical ticks, so the corners are fine too (user 2026-11-24: 3000 was missing); not at the end
+            if (s < acc - 4) {
                 TeleLayout.tp(s, o);
                 tickX[nt] = o[0];
                 ticks[nt++] = s;
@@ -113,8 +113,11 @@ public final class TeleStrip {
                 }
                 // Track: an outlined band (after Audi's RS performance layout): a near-black body and
                 // a 1.5 px hairline edge, red past the redline; faint ticks.
-                boolean red = bs >= sRed;
-                int tc = red ? 0x1A0706FF : 0x0B0E12FF;
+                // red zone = the right slope, cut vertically at its corner (the red line), with
+                // hazard stripes (user 2026-11-24)
+                boolean red = x >= TeleLayout.TP_X[2];
+                boolean hazard = red && ((int) Math.floor((x + y) / 9.0) & 1) == 0;
+                int tc = red ? (hazard ? 0x4A1210FF : 0x1A0706FF) : 0x0B0E12FF;
                 int edge = red ? 0x8A2219FF : 0x56606BFF;
                 tc = TeleLayout.mix(tc, edge, (float) clamp01(2.0 - inside));
                 tc = TeleLayout.mix(tc, TeleLayout.LINE, (float) (tick * 0.6 * clamp01(inside - 1.5)));
@@ -123,7 +126,7 @@ public final class TeleStrip {
                 // red past it; a soft tube shading across, darker ticks.
                 int rpm = t.sToRpm(bs);
                 int warm = t.redlineRpm - 1500;
-                int lc = bs >= sShift ? TeleLayout.RED
+                int lc = x >= TeleLayout.TP_X[2] ? TeleLayout.RED
                     : rpm <= warm ? TeleLayout.STRIP_LO
                     : TeleLayout.mix(TeleLayout.STRIP_LO, TeleLayout.AMBER, (rpm - warm) / 1500f);
                 // inset 2.5 px so the hairline edge stays around the fill
