@@ -475,7 +475,7 @@ tele)
             slay -f ttlink 2>/dev/null; say 'Stopped ttlink (it held UDP 49160, which the view needs).'
         fi
     }
-    # OpenHaldex autocross view (tt-zoom tele15, wiki Telemetry.md): our own full-screen picture over
+    # OpenHaldex autocross view (tt-zoom tele16, wiki Telemetry.md): our own full-screen picture over
     # the map tab (Classic) or the small view's map area (Sport). RAM switches, read within 1 s;
     # "boot" writes the one flash default.
     case "${2:-}" in

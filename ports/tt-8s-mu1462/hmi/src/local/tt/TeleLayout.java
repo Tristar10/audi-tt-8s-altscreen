@@ -734,8 +734,8 @@ public final class TeleLayout {
         int lw = 18;
         int lgap = 4;
         int lx = 200;
-        int lyt = 90; // tele15: everything 10-18 px lower, the top was against the frame
-        int lh = 18;
+        int lyt = 90; // tele15: everything lower, the top was against the frame
+        int lh = 26; // tele16: thicker
         for (int i = 0; i < nl; i++) {
             int on = shiftRpm - (nl - i) * 120;
             boolean lit = link && (over ? blink : rpm >= on);
@@ -743,45 +743,45 @@ public final class TeleLayout {
             int sx = lx + i * (lw + lgap);
             quad(sx + 5, lyt - 1, sx + lw + 6, lyt - 1, sx + lw + 1, lyt + lh + 1, sx - 1, lyt + lh + 1, GLASS_EDGE, true);
             quad(sx + 6, lyt, sx + lw + 5, lyt, sx + lw, lyt + lh, sx, lyt + lh, c, true);
-            quad(sx + 7, lyt + 3, sx + lw + 3, lyt + 3, sx + lw + 1, lyt + 8, sx + 5, lyt + 8, 0xFFFFFF5C, lit);
+            quad(sx + 7, lyt + 3, sx + lw + 3, lyt + 3, sx + lw + 1, lyt + 10, sx + 5, lyt + 10, 0xFFFFFF5C, lit);
         }
 
         // Haldex lock: icon, strip with the target tick, percent.
         int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
         int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
-        icon(x0, 128, 32, TeleIcons.AWD, ICONC, true);
-        bar(x0 + 44, 139, 250, 10, act, 0, link ? HALDEX : GREY, -1);
-        box(x0 + 44 + 250 * tgt / 100 - 1, 132, 2, 24, WHITE, ok(CH_HX_TARGET));
-        text(x1, 124, 36, false, RIGHT, vc, ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
+        icon(x0, 138, 32, TeleIcons.AWD, ICONC, true);
+        bar(x0 + 44, 149, 250, 10, act, 0, link ? HALDEX : GREY, -1);
+        box(x0 + 44 + 250 * tgt / 100 - 1, 142, 2, 24, WHITE, ok(CH_HX_TARGET));
+        text(x1, 134, 36, false, RIGHT, vc, ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
 
         // Gear, red past the shift point, flashing at the limiter; temperatures beside it.
         int gc = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
-        gearGlyph(112, 174, 170, gc);
-        text(112, 334, 22, true, CENTER, AMBER, "NO LINK", !link);
-        box(222, 176, 2, 196, LINE, true);
+        gearGlyph(112, 182, 170, gc);
+        text(112, 342, 22, true, CENTER, AMBER, "NO LINK", !link);
+        box(222, 184, 2, 196, LINE, true);
         int row = 0;
         for (int t = 0; t < T_CH.length; t++) {
             if (T_CH[t] == CH_OIL)
                 continue; // the stock Sport view shows oil temperature
-            tempCell(t, 240, x1, 176 + row * 50, 34, 36, rpm);
+            tempCell(t, 240, x1, 184 + row * 50, 34, 36, rpm);
             row++;
         }
 
         // Preset and mode under the gear; Wi-Fi warning beside them while the link is slow or lost.
-        text(x0, 362, 28, false, LEFT, link ? PRESET : GREY, presetName(), true);
-        text(x0 + 2, 392, 15, true, LEFT, GREY, presetMode(), true);
+        text(x0, 370, 28, false, LEFT, link ? PRESET : GREY, presetName(), true);
+        text(x0 + 2, 400, 15, true, LEFT, GREY, presetMode(), true);
         boolean slow = link && rateHz >= 0 && rateHz < 10;
-        icon(190, 364, 22, TeleIcons.WIFI, AMBER, !link || slow);
+        icon(190, 372, 22, TeleIcons.WIFI, AMBER, !link || slow);
 
         // Boost: icon, strip from vacuum to boost with zero marked, value in bar.
         int kpa = ok(CH_BOOST) ? r(val[CH_BOOST]) : 0;
         boolean boosting = link && kpa > 0;
         int zero = (0 - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN);
         int pos = clamp((kpa - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN), 0, 100);
-        icon(x0, 418, 30, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
-        bar(x0 + 44, 428, 250, 10, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
-        text(x1 - 36, 414, 34, false, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
-        text(x1, 428, 14, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
+        icon(x0, 424, 30, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
+        bar(x0 + 44, 434, 250, 10, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
+        text(x1 - 36, 420, 34, false, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
+        text(x1, 434, 14, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
 
         // Redline warning frame on top: a thick red line along the panel outline with a glow,
         // flashing with the shift lights.
