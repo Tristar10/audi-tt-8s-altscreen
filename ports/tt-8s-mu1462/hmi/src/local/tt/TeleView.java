@@ -35,6 +35,10 @@ import de.esolutions.hmi.widgets.audi.base.eal.TextureDescription;
  *   /tmp/tt-tele-demo    sweeping fake values, no OpenHaldex needed (the UDP port stays closed)
  *   /tmp/tt-tele-rot     tilted text and icons: -deg (default, right on the car), deg, rad, -rad, off
  *   /tmp/tt-tele-font    text size in percent of the layout's (default 70, see fontPct)
+ *   /tmp/tt-tele-beep    tele10: "N [system|ring]" plays the head unit's tone N once (or "default",
+ *                        "stop"), then the file is deleted; the log has the delay (TeleBeep)
+ *   /tmp/tt-tele-shiftbeep  tele10: "N [system|ring]": play that tone each time rpm rises past
+ *                        the shift point (re-armed 300 rpm below it)
  *   /tmp/tt-tele-probe   tele8 probe instead of the view: the painted rev strip (TeleStrip), the
  *                        lit picture cut by a clip rectangle at the rpm. "grp" (default): the clip
  *                        on a group holding the picture; "img": on the picture itself
@@ -53,6 +57,10 @@ public final class TeleView implements Runnable {
     private static final File ROT_FILE = new File("/tmp/tt-tele-rot");
     private static final File FONT_FILE = new File("/tmp/tt-tele-font");
     private static final File PROBE_FILE = new File("/tmp/tt-tele-probe");
+    private static final File BEEP_FILE = new File("/tmp/tt-tele-beep");
+    private static final File SHIFTBEEP_FILE = new File("/tmp/tt-tele-shiftbeep");
+    private static volatile String shiftBeep;
+    private static boolean beepArmed = true;
     /** Above the turn panel's 225, so the autocross view covers it. */
     private static final int VIEWPORT_INDEX = 228;
     private static final int SOLID = 8;
@@ -179,6 +187,7 @@ public final class TeleView implements Runnable {
                     } else {
                         TeleLink.snapshot(layout, now);
                     }
+                    shiftTone(layout);
                     if (probeMode >= 0) {
                         f = probeFrame(layout, now);
                     } else {
@@ -756,6 +765,12 @@ public final class TeleView implements Runnable {
     private static void readSwitches() {
         on = ON_FILE.exists() || (DEFAULT_ON.exists() && !OFF_FILE.exists());
         demo = DEMO_FILE.exists();
+        String bl = readLine(BEEP_FILE);
+        if (bl != null) {
+            BEEP_FILE.delete();
+            RgdBus.note(beepCmd(bl));
+        }
+        shiftBeep = readLine(SHIFTBEEP_FILE);
         String pm = readLine(PROBE_FILE);
         probeMode = pm == null ? -1 : pm.equals("img") ? 1 : 0;
         // Default -deg: on the car (tele1) +deg tilted the corner text against the slopes.
@@ -793,6 +808,40 @@ public final class TeleView implements Runnable {
             rotSign = sign;
             rotOff = off;
             rotGen = (rotGen + 1) & 0xFFF; // rebuild, so every node is placed again
+        }
+    }
+
+    /** "N [system|ring]", "default [system|ring]" or "stop". */
+    private static String beepCmd(String l) {
+        java.util.StringTokenizer t = new java.util.StringTokenizer(l);
+        String a = t.hasMoreTokens() ? t.nextToken() : "";
+        String which = t.hasMoreTokens() ? t.nextToken() : "system";
+        if (a.equals("stop")) {
+            return TeleBeep.stop();
+        }
+        if (a.equals("default")) {
+            return TeleBeep.play(which, -1);
+        }
+        try {
+            return TeleBeep.play(which, Integer.parseInt(a));
+        } catch (NumberFormatException e) {
+            return "tele beep: N [system|ring] | default [system|ring] | stop";
+        }
+    }
+
+    /** Shift tone test: once per rise past the shift point, re-armed 300 rpm below it. */
+    private static void shiftTone(TeleLayout layout) {
+        String sb = shiftBeep;
+        if (sb == null) {
+            return;
+        }
+        int rpm = layout.link && layout.has[TeleLayout.CH_RPM] ? (layout.val[TeleLayout.CH_RPM] + 500) / 1000 : 0;
+        if (beepArmed && rpm >= layout.shiftRpm) {
+            beepArmed = false;
+            RgdBus.note(new StringBuffer("tele shift tone at ").append(rpm).append(" rpm: ").append(beepCmd(sb))
+                .toString());
+        } else if (!beepArmed && rpm < layout.shiftRpm - 300) {
+            beepArmed = true;
         }
     }
 

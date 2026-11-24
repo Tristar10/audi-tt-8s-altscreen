@@ -165,7 +165,29 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele9)
+## Autocross view on the head unit (tt-zoom tele10)
+
+tele10 = the Classic layout reviewed in the simulator (fatter, lower strip; upright numbers and
+ticks; everything on the centre line x 720; red line at 6800 with a hazard-striped red zone; flat
+FL5-style boost bar; ice -> sakura -> red colours; strip and shift lights flash together and the
+strip turns red from 6500) plus a **shift tone probe**.
+
+Shift tone (2026-11-24): the head unit has no click or acknowledgement tone, but its own sound
+effects go through the stock wave player service `de.audi.tghu.waveplayer.WavePlayer`
+(`getSystemTonePlayer()` / `getRingTonePlayer()`, `playTone(PLAY_ONCE, id)`): the message chime and
+the ringtone preview use it; underneath it is the native `DSIWavePlayer`, which requests its own
+audio slot. Each caller gets its own player client, so the stock users are untouched. Reached
+through `HMITerminal.getFramework().getBundleCxt()`. TeleBeep logs every state the player reports
+with the milliseconds since the request (the delay is the open question; mixing with music does
+not matter to the user).
+
+Probe (parked, view on): `sh tt.sh tele sounds` lists the sound files on the head unit (tone ids
+and formats); `sh tt.sh tele beep N` (or `beep N ring`, `beep default`, `beep stop`) plays tone N
+once; `grep beep /tmp/tt-rgd.log | tail` shows "playing after X ms" and "finished after Y ms".
+`sh tt.sh tele shiftbeep N` plays it each time rpm rises past 6500 (try with `tele demo on`).
+
+### Earlier: tele9
+
 
 User 2026-11-24: make the UI more delicate, after screenshots of the stock cockpit. Reference: Audi's
 RS performance layout (a retrofit company's photo of a real cluster): a thin outlined rev band with

@@ -475,7 +475,7 @@ tele)
             slay -f ttlink 2>/dev/null; say 'Stopped ttlink (it held UDP 49160, which the view needs).'
         fi
     }
-    # OpenHaldex autocross view (tt-zoom tele9, wiki Telemetry.md): our own full-screen picture over
+    # OpenHaldex autocross view (tt-zoom tele10, wiki Telemetry.md): our own full-screen picture over
     # the map tab (Classic) or the small view's map area (Sport). RAM switches, read within 1 s;
     # "boot" writes the one flash default.
     case "${2:-}" in
@@ -489,6 +489,17 @@ tele)
                deg|-deg|rad|-rad|off) echo "$3" > /tmp/tt-tele-rot; say "Tilted text and icons: $3";;
                *) say 'Usage: sh tt.sh tele rot deg | -deg | rad | -rad | off   (default -deg, right on the car)'
                   exit 2;; esac;;
+        beep) case "${3:-}" in
+               ""|-h) say 'Usage: sh tt.sh tele beep N [system|ring] | default [system|ring] | stop'
+                      say '   plays the head unit tone N once (view must be on); delay in: grep beep /tmp/tt-rgd.log'; exit 2;;
+               *) echo "$3 ${4:-system}" > /tmp/tt-tele-beep; say "Tone $3 (${4:-system}) requested; within 1 s. Log: grep beep /tmp/tt-rgd.log | tail";; esac;;
+        shiftbeep) case "${3:-}" in
+               off) rm -f /tmp/tt-tele-shiftbeep; say 'Shift tone off.';;
+               ""|-h) say 'Usage: sh tt.sh tele shiftbeep N [system|ring] | off   (plays tone N each time rpm rises past 6500)'; exit 2;;
+               *) echo "$3 ${4:-system}" > /tmp/tt-tele-shiftbeep; say "Shift tone: tone $3 (${4:-system}) at the shift point. Off: sh tt.sh tele shiftbeep off";; esac;;
+        sounds) say 'Sound files on the head unit (also saved to /tmp/tt-sounds.txt):'
+                find /mnt /eso /fs -type f \( -name '*.wav' -o -name '*.WAV' -o -name '*.pcm' -o -name '*.mp3' -o -name '*.ogg' \) > /tmp/tt-sounds.txt 2>/dev/null
+                cat /tmp/tt-sounds.txt | head -60; say "$(wc -l < /tmp/tt-sounds.txt) files";;
         probe) case "${3:-on}" in
                on|grp) echo grp > /tmp/tt-tele-probe; say 'Strip probe on (clip on a group). For the sweep: sh tt.sh tele demo on';;
                img) echo img > /tmp/tt-tele-probe; say 'Strip probe on (clip on the picture). For the sweep: sh tt.sh tele demo on';;
@@ -498,7 +509,7 @@ tele)
                on) rw; touch $K/tele-on; ro; say 'Autocross view on at every MMI start.';;
                off) rw; rm -f $K/tele-on; ro; say 'Autocross view no longer on at start.';;
                *) say 'Usage: sh tt.sh tele boot on | off'; exit 2;; esac;;
-        *) say 'Usage: sh tt.sh tele on | off | demo on|off | probe on|img|off | rot deg|-deg|rad|-rad|off | boot on|off'
+        *) say 'Usage: sh tt.sh tele on | off | demo on|off | beep N | shiftbeep N|off | sounds | probe on|img|off | rot deg|-deg|rad|-rad|off | boot on|off'
            say "   now: $(test -e /tmp/tt-tele-on && echo on || (test -e $K/tele-on && ! test -e /tmp/tt-tele-off && echo on || echo off)), demo $(test -e /tmp/tt-tele-demo && echo on || echo off), probe $(cat /tmp/tt-tele-probe 2>/dev/null || echo off), tilt $(cat /tmp/tt-tele-rot 2>/dev/null || echo -deg)"
            exit 2;;
     esac
