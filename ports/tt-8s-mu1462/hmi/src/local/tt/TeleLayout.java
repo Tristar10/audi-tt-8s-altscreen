@@ -721,14 +721,29 @@ public final class TeleLayout {
         int x0 = 32;
         int x1 = 416;
 
-        // Redline warning, under everything else: a red tint over the panel and a hazard band
-        // along its top, both flashing with the shift lights (fixed shapes, only shown or hidden).
+        // Redline warning, under everything else: a red tint over the panel, flashing with the
+        // shift lights (a fixed shape, only shown or hidden).
         boolean warn = over && blink;
         box(8, 120, 486, 340, 0xFF3B3030, warn);
         quad(8, 120, 184, 74, 494, 74, 494, 120, 0xFF3B3030, warn);
-        for (int i = 0; i < 12; i++) {
-            int sx = 196 + i * 26;
-            quad(sx, 78, sx + 13, 78, sx + 3, 98, sx - 10, 98, 0xFF3B30C0, warn);
+
+        // Shift lights along the panel's top (user 2026-11-24, in place of the hazard band): ten
+        // glass segments lighting left to right over the last 1200 rpm, mint, cobalt, red, then all
+        // flashing red from the shift point with the frame.
+        int nl = 10;
+        int lw = 18;
+        int lgap = 4;
+        int lx = 200;
+        int lyt = 80;
+        int lh = 18;
+        for (int i = 0; i < nl; i++) {
+            int on = shiftRpm - (nl - i) * 120;
+            boolean lit = link && (over ? blink : rpm >= on);
+            int c = !lit ? GLASS_OFF : over ? RED : i < 3 ? MINT : i < 6 ? COBALT_LT : RED;
+            int sx = lx + i * (lw + lgap);
+            quad(sx + 5, lyt - 1, sx + lw + 6, lyt - 1, sx + lw + 1, lyt + lh + 1, sx - 1, lyt + lh + 1, GLASS_EDGE, true);
+            quad(sx + 6, lyt, sx + lw + 5, lyt, sx + lw, lyt + lh, sx, lyt + lh, c, true);
+            quad(sx + 7, lyt + 3, sx + lw + 3, lyt + 3, sx + lw + 1, lyt + 8, sx + 5, lyt + 8, 0xFFFFFF5C, lit);
         }
 
         // Haldex lock: icon, strip with the target tick, percent.
