@@ -59,6 +59,17 @@ public final class TeleLayout {
     public static final int NOTCH_GLOW = 2;
     public static final int NOTCH_GLOW_W = 248;
     public static final int NOTCH_GLOW_H = 124;
+    /** Sport's theme chibis (2026-11-25): live page only. White-haired top right, doll bottom right. */
+    public static final int SP_WHITE = 3;
+    public static final int SP_WHITE_X = 390;
+    public static final int SP_WHITE_Y = 100;
+    public static final int SP_WHITE_W = 69;
+    public static final int SP_WHITE_H = 96;
+    public static final int SP_DOLL = 4;
+    public static final int SP_DOLL_X = 410;
+    public static final int SP_DOLL_Y = 381;
+    public static final int SP_DOLL_W = 73;
+    public static final int SP_DOLL_H = 86;
     /** Picture sizes on the screen (the files on the car are exactly these). */
     public static final int CAR_UP_W = 128;
     public static final int CAR_UP_H = 264;
@@ -68,6 +79,8 @@ public final class TeleLayout {
     public boolean carArt;
     /** The notch glow picture is on the head unit (TeleView sets it). */
     public boolean glowArt;
+    /** The Sport chibi pictures are on the head unit (TeleView sets it). */
+    public boolean chibiArt;
     public static final int LEFT = 0;
     public static final int CENTER = 1;
     public static final int RIGHT = 2;
@@ -760,6 +773,13 @@ public final class TeleLayout {
         box(28, 106, 420, 349, 0xFF3B3030, warn); // the bezel and the dial cover what lies outside SP_X/SP_Y
         quad(448, 106, 541, 106, 458, 235, 448, 290, 0xFF3B3030, warn); // up to the dial's ring
         quad(448, 290, 451, 349, 490, 455, 448, 455, 0xFF3B3030, warn);
+        // the theme's two chibis (pictures, so the Haldex page can leave them out)
+        if (themed && chibiArt && page != PAGE_HALDEX) {
+            int ci = add(IMAGE, SP_WHITE_X, SP_WHITE_Y, SP_WHITE_W, SP_WHITE_H, WHITE, true);
+            size[ci] = SP_WHITE;
+            ci = add(IMAGE, SP_DOLL_X, SP_DOLL_Y, SP_DOLL_W, SP_DOLL_H, WHITE, true);
+            size[ci] = SP_DOLL;
+        }
 
         // Shift lights along the panel's top (user 2026-11-24, in place of the hazard band): ten
         // glass segments lighting left to right over the last 1200 rpm, mint, cobalt, red, then all
@@ -781,12 +801,13 @@ public final class TeleLayout {
         }
 
         if (page == PAGE_HALDEX) {
-            // car upright in the left column; gauge and stats on the right
+            // 2026-11-25 (user's sketch): the car upright on the left with the torque share beside
+            // its axles, then a column further right (the chibis are hidden on this page): the
+            // lock as a segmented bar, target, steering, clutch. No gear here.
             drivetrain(70, 142, 160, 280, false);
-            lockRing(320, 220, 56, 14);
-            hxStats(236, 296, 424, 24, 50, false);
-            int gcS = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
-            gearGlyph(398, 308, 44, gcS); // beside the stats, clear of the bottom row
+            torqueSplit();
+            lockBar(318, 146, 446);
+            hxStats(318, 236, 446, 28, 64, false);
         } else {
         // Haldex lock: icon, strip with the target tick, percent.
         int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
@@ -1093,11 +1114,26 @@ public final class TeleLayout {
         boolean hot = ct >= 90;
         text(x0, y, ls, true, LEFT, GREY, "CLUTCH", true);
         text(x0, y + vy, vs, true, LEFT, hot ? HX_PINK : vc, ct >= 0 ? temp(ct) : "-", true);
-        int bw = x1 - x0 - 4;
-        int by = y + vy + vs + 6;
-        box(x0, by, bw, 6, HX_IDLE, true);
-        box(x0 + bw * 90 / 120, by - 2, 2, 10, 0xFF548F60, true);
-        box(x0, by, ct > 0 ? Math.max(6, bw * Math.min(ct, 120) / 120) : 0, 6, hot ? HX_PINK : HX_CYAN, ct > 0);
+        // (the clutch temperature bar under it went 2026-11-25, user)
+    }
+
+    /** Sport's lock (user's sketch, 2026-11-25): LOCK, the value, a 10-segment bar with the target tick. */
+    private void lockBar(int x0, int y0, int x1) {
+        int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
+        int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
+        text(x0, y0, 12, true, LEFT, GREY, "LOCK", true);
+        text(x1, y0 - 6, 30, true, RIGHT, link && act > 0 ? HX_CYAN : link ? WHITE : GREY,
+            ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
+        int segs = 10;
+        int gap = 3;
+        int sw = (x1 - x0 - (segs - 1) * gap) / segs;
+        int by = y0 + 36;
+        for (int k = 0; k < segs; k++) {
+            boolean on = link && act > 0 && k * 100 / segs < act;
+            box(x0 + k * (sw + gap), by, sw, 14, on ? mix(HX_BLUE, HX_CYAN, (k + 1) / (float) segs) : HX_IDLE, true);
+        }
+        int ti = Math.min(segs - 1, tgt * segs / 100);
+        box(x0 + ti * (sw + gap) + sw / 2 - 1, by - 4, 3, 22, HX_PINK, link && ok(CH_HX_TARGET));
     }
 
     /**
@@ -1110,16 +1146,30 @@ public final class TeleLayout {
         boolean have = link && ok(CH_HX_ACTUAL);
         int rear = (act + 1) / 2;
         int front = 100 - rear;
-        int midY = carBox[1] + carBox[3] / 2;
-        int rx = carBox[0] - 38; // centre of the tail label
-        int fx = carBox[0] + carBox[2] + 40; // centre of the nose label
         int rc = !have ? GREY : rear > 0 ? rearColour(act) : GREY;
-        text(rx, midY - 26, 30, true, CENTER, have ? (rear > 0 ? HX_CYAN : WHITE) : GREY,
+        int rx, ry, fx, fy, ns, cs;
+        if (carSide) { // Classic: at the tail and the nose
+            int midY = carBox[1] + carBox[3] / 2;
+            rx = carBox[0] - 38;
+            fx = carBox[0] + carBox[2] + 40;
+            ry = midY;
+            fy = midY;
+            ns = 30;
+            cs = 12;
+        } else { // Sport: right of the car, beside each axle
+            rx = carBox[0] + carBox[2] + 34;
+            fx = rx;
+            fy = cpt(0.5, 0.232)[1];
+            ry = cpt(0.5, 0.788)[1];
+            ns = 28;
+            cs = 11;
+        }
+        text(rx, ry - ns + 4, ns, true, CENTER, have ? (rear > 0 ? HX_CYAN : WHITE) : GREY,
             have ? Integer.toString(rear) : "-", true);
-        text(rx + 1, midY + 8, 12, true, CENTER, GREY, "% REAR", true);
-        text(fx, midY - 26, 30, true, CENTER, have ? HX_ICE : GREY, have ? Integer.toString(front) : "-", true);
-        text(fx, midY + 8, 12, true, CENTER, GREY, "% FRONT", true);
-        box(rx - 16, midY + 26, 32, 3, rc, have && rear > 0);
+        text(rx + 1, ry + 8, cs, true, CENTER, GREY, "% REAR", true);
+        text(fx, fy - ns + 4, ns, true, CENTER, have ? HX_ICE : GREY, have ? Integer.toString(front) : "-", true);
+        text(fx, fy + 8, cs, true, CENTER, GREY, "% FRONT", true);
+        box(rx - 16, ry + 26, 32, 3, rc, have && rear > 0);
     }
 
     /** A line from (ax,ay) to (bx,by), w px thick, as a quad (a little longer to close joints). */
