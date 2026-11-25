@@ -165,7 +165,31 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele20)
+## Autocross view on the head unit (tt-zoom tele21)
+
+First full car test (2026-11-24, tele20, selftest log and photos):
+- Worked: 24-29 frames/s, instant view switching after the first build (0.3 s), car pictures and
+  theme loaded, the painted-strip clip in group mode tracked the rpm exactly (clip on the picture
+  itself landed at the wrong y), wheel keys traced: 17 scroll-wheel press, 20 roll (both ways), 19
+  View, 15 Back.
+- Gear digit flipped (2 <-> 5 at the redline flash): each slot kept one picture per colour, so a
+  digit change in the same colour reused an old digit. tele21 keys the pictures by what they show
+  (shape and colour), up to 12 per slot, replacing the oldest.
+- Sport clipped on the left ("TOCROSS", boost icon hidden): the frame's curve cuts in further than
+  the traced outline. tele21 outline and content follow the curve measured on the photos.
+- Haldex page tyres were grey blocks over the livery: now outlines.
+- Shift tone: silent for system tones 1-8, default and ringtone 1 (each "finished" in 7-150 ms).
+  The only sound files are the 11 ringtones in /mnt/app/hb/ringtones/. Still open.
+- tele21 draws the painted strip on the car (group clip) when the simulator-exported pictures
+  strip-track/lit/red.rgba (1416 x 176) are installed (`sh tt.sh tele pictures`); painting them on
+  the head unit took 4.7 s.
+- Default wheel map (no key map file): double press of 17 switches the view, long press of 17 opens
+  the Haldex pop-up, roll 20 (direction from WheelButtonEvent.getDirection) changes the page or
+  moves in the pop-up, 15 Back closes it; inside the pop-up 17 is its press. Stock actions still
+  happen. /tmp/tt-tele-keys-off disables the map.
+
+### Earlier: tele20
+
 
 The Haldex page draws the car's own livery from above (the user's top-down picture, the iPhone app's
 `CarTop.png`, 660 x 1360) under the drivetrain, placed with the app's `CarGeometry` (centre x 0.495,

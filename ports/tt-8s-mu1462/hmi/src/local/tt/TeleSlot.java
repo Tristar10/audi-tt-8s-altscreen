@@ -9,10 +9,20 @@ import de.esolutions.hmi.widgets.audi.base.eal.IWrappedNode3DText;
  * one picture per colour the slot has used, or one text node. A plain class.
  */
 final class TeleSlot {
-    static final int MAX_COLOURS = 6;
+    /**
+     * Pictures kept per slot (tele21: keyed by picture, i.e. shape and colour; tele20 keyed them by
+     * colour only, so a gear digit could come back as an old digit of the same colour).
+     */
+    static final int MAX_COLOURS = 12;
 
     IWrappedNode3D group;
     final int[] colours = new int[MAX_COLOURS];
+    final long[] keys = new long[MAX_COLOURS];
+    long shownKey = Long.MIN_VALUE;
+    int evict;
+    /** STRIP slot: its clip is set up (tele21). */
+    boolean clipped;
+    int shownClipW = -1;
     final IWrappedNode3DImage[] imgs = new IWrappedNode3DImage[MAX_COLOURS];
     int nImgs;
     IWrappedNode3DImage shownImg;

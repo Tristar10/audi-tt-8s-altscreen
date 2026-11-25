@@ -82,6 +82,11 @@ public final class TeleView implements Runnable {
         {TeleLayout.CAR_SIDE_W, TeleLayout.CAR_SIDE_H}};
     private static final byte[][] CAR = new byte[2][];
     private static boolean carTried;
+    /** tele21: the painted strip's pictures (track, lit, lit red), simulator export, read once. */
+    private static final File[] STRIP_FILES = {new File(DIR, "strip-track.rgba"), new File(DIR, "strip-lit.rgba"),
+        new File(DIR, "strip-red.rgba")};
+    private static final byte[][] STRIP_PX = new byte[3][];
+    private static boolean stripTried;
     private static final File GLIDE_RAM = new File("/tmp/tt-tele-glide");
     private static final File GLIDE_FLASH = new File(DIR, "tele-glide");
     private static volatile boolean glide;
@@ -246,6 +251,7 @@ public final class TeleView implements Runnable {
                         int theme = themeOn && themeLoaded(view) ? view : -1;
                         layout.themed = theme >= 0;
                         layout.carArt = carLoaded();
+                        layout.paintedStrip = stripLoaded();
                         layout.overflow = false;
                         layout.build(view, UI.page());
                         if (layout.overflow && !overflowNoted) {
@@ -326,6 +332,58 @@ public final class TeleView implements Runnable {
         other.build(small ? TeleLayout.VIEW_LARGE : TeleLayout.VIEW_SMALL, TeleLayout.PAGE_LIVE);
         prepareArt(TeleFrame.of(other, -1));
         prewarmedGen = gen;
+    }
+
+    /** Reads the three strip pictures once (premultiplied); true when all are there. */
+    private static boolean stripLoaded() {
+        if (stripTried) {
+            return STRIP_PX[0] != null && STRIP_PX[1] != null && STRIP_PX[2] != null;
+        }
+        stripTried = true;
+        long want = (long) TeleStrip.W * TeleStrip.H * 4;
+        for (int k = 0; k < 3; k++) {
+            byte[] b = readRgba(STRIP_FILES[k], want);
+            if (b == null) {
+                RgdBus.note(new StringBuffer("tele strip: ").append(STRIP_FILES[k].getPath())
+                    .append(" missing or wrong size (strip drawn from pieces)").toString());
+                return false;
+            }
+            STRIP_PX[k] = b;
+        }
+        RgdBus.note("tele strip: painted strip pictures loaded");
+        return true;
+    }
+
+    /** A non-premultiplied RGBA file of exactly want bytes, premultiplied for EAL; null if not. */
+    private static byte[] readRgba(File f, long want) {
+        if (!f.exists() || f.length() != want) {
+            return null;
+        }
+        try {
+            byte[] b = new byte[(int) want];
+            java.io.FileInputStream in = new java.io.FileInputStream(f);
+            try {
+                int o = 0;
+                while (o < b.length) {
+                    int n = in.read(b, o, b.length - o);
+                    if (n < 0) {
+                        break;
+                    }
+                    o += n;
+                }
+            } finally {
+                in.close();
+            }
+            for (int j = 0; j < b.length; j += 4) {
+                int a = b[j + 3] & 0xFF;
+                b[j] = (byte) ((b[j] & 0xFF) * a / 255);
+                b[j + 1] = (byte) ((b[j + 1] & 0xFF) * a / 255);
+                b[j + 2] = (byte) ((b[j + 2] & 0xFF) * a / 255);
+            }
+            return b;
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     /** Reads both car pictures once (premultiplied for EAL); true when both are there. */
@@ -485,6 +543,11 @@ public final class TeleView implements Runnable {
                 if (px == null) {
                     continue;
                 }
+            } else if (f.kind[i] == TeleLayout.STRIP) {
+                px = STRIP_PX[Math.min(2, f.size[i])];
+                if (px == null) {
+                    continue;
+                }
             } else if (f.kind[i] == TeleLayout.BOX) {
                 px = solid(f.rgba[i]);
             } else if (f.kind[i] == TeleLayout.ICON) {
@@ -509,6 +572,9 @@ public final class TeleView implements Runnable {
         }
         if (f.kind[i] == TeleLayout.IMAGE) {
             return new Long(0x7700000000L | f.size[i]);
+        }
+        if (f.kind[i] == TeleLayout.STRIP) {
+            return new Long(0x7800000000L | f.size[i]);
         }
         return null;
     }
@@ -862,29 +928,45 @@ public final class TeleView implements Runnable {
             }
         }
         int c = f.rgba[i];
-        if (c != s.shownColour) {
+        Long kk = artKey(f, i);
+        long key = kk == null ? c : kk.longValue();
+        if (key != s.shownKey) {
             IWrappedNode3DImage img = null;
             for (int k = 0; k < s.nImgs; k++) {
-                if (s.colours[k] == c) {
+                if (s.keys[k] == key) {
                     img = s.imgs[k];
                 }
             }
             if (img == null) {
-                if (s.nImgs >= TeleSlot.MAX_COLOURS) {
-                    return; // never expected: each slot uses only a few colours
-                }
                 if (uploadsLeft <= 0) {
                     needMore = true; // the next job carries on (tele11)
                     return;
+                }
+                int slot;
+                if (s.nImgs < TeleSlot.MAX_COLOURS) {
+                    slot = s.nImgs;
+                } else {
+                    // full: replace the oldest picture that is not on screen
+                    slot = s.evict;
+                    if (s.imgs[slot] == s.shownImg) {
+                        slot = (slot + 1) % TeleSlot.MAX_COLOURS;
+                    }
+                    s.evict = (slot + 1) % TeleSlot.MAX_COLOURS;
+                    IWrappedNode3DImage old = s.imgs[slot];
+                    if (old != null) {
+                        s.group.remove(old);
+                        m.destroy(old);
+                    }
                 }
                 uploadsLeft--;
                 img = upload(m, s, f, i);
                 if (img == null) {
                     return;
                 }
-                if (s.nImgs < TeleSlot.MAX_COLOURS) {
-                    s.colours[s.nImgs] = c;
-                    s.imgs[s.nImgs] = img;
+                s.keys[slot] = key;
+                s.colours[slot] = c;
+                s.imgs[slot] = img;
+                if (slot == s.nImgs) {
                     s.nImgs++;
                 }
                 s.sx = Integer.MIN_VALUE; // place the new node
@@ -895,10 +977,36 @@ public final class TeleView implements Runnable {
             img.setVisible(true);
             s.shownImg = img;
             s.shownColour = c;
+            s.shownKey = key;
             s.sx = Integer.MIN_VALUE;
         }
         IWrappedNode3DImage img = s.shownImg;
         if (img == null) {
+            return;
+        }
+        if (f.kind[i] == TeleLayout.STRIP) {
+            if (s.sx == Integer.MIN_VALUE) {
+                img.setScale(1f, 1f, 1f);
+                img.setPosition(f.x[i], f.y[i], 0f);
+                s.sx = f.x[i];
+            }
+            if (f.size[i] != 0) {
+                if (!s.clipped) {
+                    if (s.group.getScreenWidth() <= 0) {
+                        s.group.setScreenSize(m.getScreenWidth(), m.getScreenHeight());
+                    }
+                    s.group.setClippingInheritance(IWrappedNode3D.CLIPPING_TYPE_INHERIT_FROM_ANCESTOR
+                        | IWrappedNode3D.CLIPPING_TYPE_INHERIT_TO_CHILDREN);
+                    s.group.useClippingRectangle(true);
+                    s.group.setClippingRectangle(f.x[i], f.y[i], f.w[i], f.h[i]);
+                    s.group.setClipping(true);
+                    s.clipped = true;
+                    s.shownClipW = f.w[i];
+                } else if (f.w[i] != s.shownClipW) {
+                    s.group.setClippingRectangle(f.x[i], f.y[i], f.w[i], f.h[i]);
+                    s.shownClipW = f.w[i];
+                }
+            }
             return;
         }
         // Icons tilt only when rotation is on; turned boxes (rev strip pieces) always turn.
@@ -935,7 +1043,10 @@ public final class TeleView implements Runnable {
         }
         int tw;
         int th;
-        if (f.kind[i] == TeleLayout.IMAGE) {
+        if (f.kind[i] == TeleLayout.STRIP) {
+            tw = TeleStrip.W;
+            th = TeleStrip.H;
+        } else if (f.kind[i] == TeleLayout.IMAGE) {
             tw = CAR_SIZE[f.size[i]][0];
             th = CAR_SIZE[f.size[i]][1];
         } else if (f.kind[i] == TeleLayout.BOX) {
@@ -1023,8 +1134,21 @@ public final class TeleView implements Runnable {
      * A press of the toggle key (TeleKeys, tele12). Two within 450 ms switch the autocross view on
      * or off.
      */
+    static boolean isOn() {
+        return on;
+    }
+
+    static boolean uiOpen() {
+        return UI.isOpen();
+    }
+
     public static boolean press() {
         long now = System.currentTimeMillis();
+        if (UI.isOpen()) {
+            TeleUi.post(TeleUi.PRESS); // inside the pop-up the wheel press is its press
+            lastPress = 0;
+            return false;
+        }
         boolean dbl = now - lastPress < 450L;
         lastPress = dbl ? 0 : now;
         if (dbl) {

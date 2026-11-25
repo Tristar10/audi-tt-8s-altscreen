@@ -4,6 +4,7 @@ import java.io.File;
 
 import de.audi.atip.hmi.event.EventDispatcherAdmin;
 import de.audi.atip.hmi.event.KeyEvent;
+import de.audi.atip.hmi.event.WheelButtonEvent;
 import de.esolutions.fw.util.commons.job.BaseJobFilter;
 import de.esolutions.fw.util.commons.job.Job;
 import de.esolutions.hmi.widgets.audi.base.eal.EALManager;
@@ -32,6 +33,9 @@ final class TeleKeys extends BaseJobFilter {
     private static boolean installed;
     private static volatile int toggleCode = -1;
     private static volatile boolean trace;
+    /** /tmp/tt-tele-keys-off: no default wheel map (only an explicit key map, if any). */
+    private static final File NO_DEFAULTS = new File("/tmp/tt-tele-keys-off");
+    private static volatile boolean noDefaults;
     private static final File MAP_RAM = new File("/tmp/tt-tele-keymap");
     private static final File MAP_FLASH = new File("/mnt/app/root/tt/tele-keymap");
     private static volatile int[][] keymap = new int[0][];
@@ -65,6 +69,7 @@ final class TeleKeys extends BaseJobFilter {
     /** Re-read the switches (TeleView, every second). */
     static void readSwitches() {
         trace = TRACE.exists();
+        noDefaults = NO_DEFAULTS.exists();
         int c = readCode(CODE_RAM);
         toggleCode = c >= 0 ? c : readCode(CODE_FLASH);
         int[][] km = readMap(MAP_RAM);
@@ -80,9 +85,31 @@ final class TeleKeys extends BaseJobFilter {
             }
             KeyEvent k = (KeyEvent) p;
             int id = k.getID();
+            int dir = -1;
+            if (k instanceof WheelButtonEvent) {
+                dir = ((WheelButtonEvent) k).getDirection();
+            }
             if (trace) {
                 RgdBus.note(new StringBuffer("tele key ").append(k.getKeyCode()).append(' ').append(kind(id))
+                    .append(dir >= 0 ? (dir == WheelButtonEvent.TURN_UP ? " up" : " down") : "")
                     .append(" terminal ").append(k.getTerminalID()).toString());
+            }
+            // Default wheel map (TT, selftest 2026-11-24): 17 the scroll-wheel press, 20 the roll
+            // (direction in the event), 15 Back. Double press of 17 switches the view, a long
+            // press opens the Haldex pop-up; roll changes the page or moves in the pop-up; Back
+            // closes it. The stock action of every key still happens. A key map file replaces this.
+            if (keymap.length == 0 && !noDefaults) {
+                int code = k.getKeyCode();
+                if (code == 17 && id == KeyEvent.KEY_PRESSED) {
+                    TeleView.press();
+                } else if (code == 17 && id == KeyEvent.KEY_LONG_PRESSED) {
+                    TeleUi.post(TeleUi.OPEN);
+                } else if (code == 20 && id == KeyEvent.KEY_TURNED && TeleView.isOn()) {
+                    TeleUi.post(dir == WheelButtonEvent.TURN_UP ? TeleUi.UP : TeleUi.DOWN);
+                } else if (code == 15 && id == KeyEvent.KEY_PRESSED && TeleView.uiOpen()) {
+                    TeleUi.post(TeleUi.BACK);
+                }
+                return;
             }
             if (id == KeyEvent.KEY_PRESSED && toggleCode >= 0 && k.getKeyCode() == toggleCode) {
                 TeleView.press();

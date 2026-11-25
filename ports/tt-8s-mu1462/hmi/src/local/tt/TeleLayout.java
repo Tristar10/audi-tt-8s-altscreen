@@ -56,8 +56,8 @@ public final class TeleLayout {
     public static final int CAR_UP = 0;
     public static final int CAR_SIDE = 1;
     /** Picture sizes on the screen (the files on the car are exactly these). */
-    public static final int CAR_UP_W = 146;
-    public static final int CAR_UP_H = 300;
+    public static final int CAR_UP_W = 128;
+    public static final int CAR_UP_H = 264;
     public static final int CAR_SIDE_W = 384;
     public static final int CAR_SIDE_H = 186;
     /** The car pictures are on the head unit (TeleView sets it): the page draws the livery. */
@@ -694,11 +694,11 @@ public final class TeleLayout {
     static final int[] SP_Y;
 
     static {
-        int[] xs = new int[16];
-        int[] ys = new int[16];
+        int[] xs = new int[24];
+        int[] ys = new int[24];
         int n = 0;
-        xs[n] = 8;
-        ys[n++] = 120;
+        xs[n] = 30;
+        ys[n++] = 112;
         xs[n] = 184;
         ys[n++] = 74;
         xs[n] = 512;
@@ -709,9 +709,14 @@ public final class TeleLayout {
             ys[n++] = y;
         }
         xs[n] = 512;
-        ys[n++] = 460;
-        xs[n] = 8;
-        ys[n++] = 460;
+        ys[n++] = 446;
+        // the frame's curve up the left side (tele21: content was clipped there on the car)
+        int[] lx = {112, 92, 76, 62, 50, 40, 34};
+        int[] ly = {446, 420, 392, 362, 320, 260, 180};
+        for (int k = 0; k < lx.length; k++) {
+            xs[n] = lx[k];
+            ys[n++] = ly[k];
+        }
         SP_X = new int[n];
         SP_Y = new int[n];
         System.arraycopy(xs, 0, SP_X, 0, n);
@@ -728,14 +733,14 @@ public final class TeleLayout {
         boolean over = link && rpm >= shiftRpm;
         boolean limit = link && rpm >= limitRpm;
         int vc = link ? WHITE : GREY;
-        int x0 = 32;
+        int x0 = 44; // tele21: left edge follows the frame's curve
         int x1 = 416;
 
         // Redline warning, under everything else: a red tint over the panel, flashing with the
         // shift lights (a fixed shape, only shown or hidden).
         boolean warn = over && blink;
-        box(8, 120, 486, 340, 0xFF3B3030, warn);
-        quad(8, 120, 184, 74, 494, 74, 494, 120, 0xFF3B3030, warn);
+        box(34, 120, 460, 300, 0xFF3B3030, warn);
+        quad(30, 120, 184, 74, 494, 74, 494, 120, 0xFF3B3030, warn);
 
         // Shift lights along the panel's top (user 2026-11-24, in place of the hazard band): ten
         // glass segments lighting left to right over the last 1200 rpm, mint, cobalt, red, then all
@@ -758,7 +763,7 @@ public final class TeleLayout {
 
         if (page == PAGE_HALDEX) {
             // car upright in the left column; gauge and stats on the right
-            drivetrain(24, 130, 190, 310, false);
+            drivetrain(70, 132, 160, 280, false);
             lockRing(320, 212, 56, 14);
             hxStats(236, 300, 424);
             int gcS = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
@@ -774,8 +779,8 @@ public final class TeleLayout {
 
         // Gear, red past the shift point, flashing at the limiter; temperatures beside it.
         int gc = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
-        gearGlyph(112, 182, 170, gc);
-        text(112, 342, 22, true, CENTER, AMBER, "NO LINK", !link);
+        gearGlyph(132, 182, 170, gc);
+        text(132, 342, 22, true, CENTER, AMBER, "NO LINK", !link);
         box(222, 184, 2, 196, LINE, true);
         int row = 0;
         for (int t = 0; t < T_CH.length; t++) {
@@ -786,8 +791,8 @@ public final class TeleLayout {
         }
 
         // Preset and mode under the gear; Wi-Fi warning beside them while the link is slow or lost.
-        text(x0, 370, 28, false, LEFT, link ? PRESET : GREY, presetName(), true);
-        text(x0 + 2, 400, 15, true, LEFT, GREY, presetMode(), true);
+        text(84, 366, 28, false, LEFT, link ? PRESET : GREY, presetName(), true);
+        text(96, 396, 15, true, LEFT, GREY, presetMode(), true);
         boolean slow = link && rateHz >= 0 && rateHz < 10;
         icon(190, 372, 22, TeleIcons.WIFI, AMBER, !link || slow);
 
@@ -796,10 +801,10 @@ public final class TeleLayout {
         boolean boosting = link && kpa > 0;
         int zero = (0 - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN);
         int pos = clamp((kpa - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN), 0, 100);
-        icon(x0, 424, 30, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
-        bar(x0 + 44, 434, 250, 10, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
-        text(x1 - 36, 420, 34, false, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
-        text(x1, 434, 14, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
+        icon(108, 418, 26, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
+        bar(142, 428, 200, 10, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
+        text(x1 - 36, 414, 32, false, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
+        text(x1, 428, 14, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
         }
 
         // Redline warning frame on top: a thick red line along the panel outline with a glow,
@@ -930,15 +935,24 @@ public final class TeleLayout {
         thick(p[0], p[1], q[0], q[1], t, c, true);
     }
 
-    /** A tyre centred at (u, v), turned by deg (clockwise seen from above). */
+    /** A tyre centred at (u, v), turned by deg (clockwise seen from above): an outline, 2.5 px. */
     private void tyre(double u, double v, double deg, double tl, double tw, int c) {
         int[] p = cpt(u, v);
         double ang = carSide ? deg : deg - 90; // the tyre runs along the car
         double rad = Math.toRadians(ang);
-        double sx = p[0] - Math.cos(rad) * tl / 2;
-        double sy = p[1] - Math.sin(rad) * tl / 2;
-        rbox(sx, sy, tl, tw + 4, ang, c, true);
-        rbox(sx + Math.cos(rad) * 2, sy + Math.sin(rad) * 2, tl - 4, tw, ang, 0x05091CB8, true);
+        double ax = Math.cos(rad);
+        double ay = Math.sin(rad);
+        double nx = -ay;
+        double ny = ax;
+        double sx = p[0] - ax * tl / 2;
+        double sy = p[1] - ay * tl / 2;
+        double t = 2.5;
+        // long sides
+        rbox(sx + nx * (tw / 2 - t / 2), sy + ny * (tw / 2 - t / 2), tl, t, ang, c, true);
+        rbox(sx - nx * (tw / 2 - t / 2), sy - ny * (tw / 2 - t / 2), tl, t, ang, c, true);
+        // ends
+        rbox(sx, sy, t, tw, ang, c, true);
+        rbox(sx + ax * (tl - t), sy + ay * (tl - t), t, tw, ang, c, true);
     }
 
 
