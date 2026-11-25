@@ -230,6 +230,10 @@ public final class TeleLayout {
     public boolean paintedStrip = false;
     /** Itasha theme on: the notch's fill is see-through so the theme's rings show behind the gear. */
     public boolean themed = false;
+    /** Soft drop shadows under texts and a recessed look on bars (2026-11-25); icons carry their own. */
+    public boolean shadows = true;
+    /** The text shadow colour, RGBA. */
+    static final int TEXT_SHADOW = 0x000000D8;
 
     // Input: latest values (x1000), whether each is fresh, link state, preset catalog.
     public final int[] val = new int[CHANNELS];
@@ -501,9 +505,9 @@ public final class TeleLayout {
         // tele24: parallel to the strip's top edge and close to it (car photo: tilted less than the
         // edge and close to the frame's top)
         int pl = slopeText(ps, half(ps) + 24 + 0.82 * 30, 30, true, LEFT, link ? PRESET : GREY, presetName(), true);
-        rot[pl] = (float) -edgeAngle();
+        turn(pl, (float) -edgeAngle());
         int ml = slopeText(ps + 12, half(ps + 12) + 58 + 0.82 * 16, 16, true, LEFT, GREY, presetMode(), true);
-        rot[ml] = (float) -edgeAngle();
+        turn(ml, (float) -edgeAngle());
         slopeIcon(l0 * 0.20, half(l0 * 0.20) + 14, 26, TeleIcons.WIFI, AMBER, !link || slow);
 
         // Top-right pocket, along the falling slope: Haldex lock. Icon and big percent, and under
@@ -533,7 +537,7 @@ public final class TeleLayout {
         rot[hi] = (float) edgeAngle();
         int hv = slopeText(ba + 50, half(ba + 50) + 56 + 0.82 * 40, 40, false, LEFT, vc,
             ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
-        rot[hv] = (float) edgeAngle();
+        turn(hv, (float) edgeAngle());
 
         if (hxPage) {
             // car sideways, nose to the right; gauge and stats to its right; the gear small in the corner
@@ -670,6 +674,13 @@ public final class TeleLayout {
         int a = Math.min(fromPct, pct);
         int b = Math.max(fromPct, pct);
         box(x0 + bw * a / 100, y0, bw * (b - a) / 100, bh, c, b > a);
+        if (shadows) {
+            // recessed track, raised fill (2026-11-25): a dark line inside the track's top, a light
+            // top edge on the fill, a faint light lip under the track
+            box(x0, y0, bw, Math.max(2, bh / 4), 0x000000B0, true);
+            box(x0 + bw * a / 100, y0, bw * (b - a) / 100, Math.max(1, bh / 4), 0xFFFFFF48, b > a);
+            box(x0, y0 + bh, bw, 1, 0xFFFFFF30, true);
+        }
         box(x0 + bw * tickPct / 100 - 1, y0 - 4, 2, bh + 8, GREY, tickPct >= 0);
     }
 
@@ -732,6 +743,15 @@ public final class TeleLayout {
     /** Text along the strip at length s, its top edge offTop px out from the centre (negative: in). */
     private int slopeText(double s, double offTop, int sz, boolean b, int al, int c, String str, boolean v) {
         tp(s, pa);
+        if (shadows) {
+            int d = shadowOffset(sz);
+            int si = add(TEXT, rd(pa[0] + pa[2] * offTop) + d, rd(pa[1] + pa[3] * offTop) + d, 0, sz, TEXT_SHADOW, v && str != null);
+            size[si] = sz;
+            bold[si] = b;
+            align[si] = al;
+            text[si] = str;
+            rot[si] = (float) Math.toDegrees(Math.atan2(pa[2], -pa[3]));
+        }
         int i = add(TEXT, rd(pa[0] + pa[2] * offTop), rd(pa[1] + pa[3] * offTop), 0, sz, c, v && str != null);
         size[i] = sz;
         bold[i] = b;
@@ -1549,7 +1569,30 @@ public final class TeleLayout {
         h[i] = maxY - minY + 1;
     }
 
+    /**
+     * Turns a slope text and its shadow (the slot before it, when shadows are on) to deg.
+     */
+    private void turn(int i, float deg) {
+        rot[i] = deg;
+        if (shadows && i > 0 && kind[i - 1] == TEXT && rgba[i - 1] == TEXT_SHADOW)
+            rot[i - 1] = deg;
+    }
+
+    /** Shadow offset for text of size sz: 1 px small, 2 px from 18 px, 3 px from 30 px. */
+    private static int shadowOffset(int sz) {
+        return sz >= 30 ? 3 : sz >= 18 ? 2 : 1;
+    }
+
     private void text(int x0, int y0, int sz, boolean b, int al, int c, String s, boolean v) {
+        if (shadows) {
+            // 2026-11-25 (user: not very 3d): a soft dark copy under every text, down and right
+            int d = shadowOffset(sz);
+            int si = add(TEXT, x0 + d, y0 + d, 0, sz, TEXT_SHADOW, v && s != null);
+            size[si] = sz;
+            bold[si] = b;
+            align[si] = al;
+            text[si] = s;
+        }
         int i = add(TEXT, x0, y0, 0, sz, c, v && s != null);
         size[i] = sz;
         bold[i] = b;

@@ -187,7 +187,54 @@ public final class TeleIcons {
                 out[py * w + pxl] = (a << 24) | (rgb & 0xFFFFFF);
             }
         }
+        if (shadows && (id >= GLYPH || id <= BRAKE))
+            shade(out, w, h);
         return out;
+    }
+
+    /** Bake a soft drop shadow into the symbols and gear glyphs (2026-11-25, user: not very 3d). */
+    public static boolean shadows = true;
+
+    /**
+     * A soft dark copy of the shape, down and right by about 5 % of the height (2..6 px), blurred,
+     * at 85 %, under the shape in the same picture.
+     */
+    private static void shade(int[] px, int w, int h) {
+        int d = Math.max(2, Math.min(6, Math.round(h * 0.05f)));
+        int r = Math.max(1, d / 2);
+        int[] m = new int[w * h];
+        for (int i = 0; i < m.length; i++)
+            m[i] = px[i] >>> 24;
+        int[] sh = new int[w * h];
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int sum = 0;
+                int n = 0;
+                for (int dy = -r; dy <= r; dy++) {
+                    for (int dx = -r; dx <= r; dx++) {
+                        int sx = x - d + dx;
+                        int sy = y - d + dy;
+                        n++;
+                        if (sx >= 0 && sy >= 0 && sx < w && sy < h)
+                            sum += m[sy * w + sx];
+                    }
+                }
+                sh[y * w + x] = sum / n;
+            }
+        }
+        for (int i = 0; i < px.length; i++) {
+            int a = m[i];
+            int sa = sh[i] * 215 / 255; // 85 %
+            int oa = a + sa * (255 - a) / 255;
+            if (oa == 0) {
+                px[i] = 0;
+                continue;
+            }
+            int rr = ((px[i] >> 16) & 0xFF) * a / oa;
+            int gg = ((px[i] >> 8) & 0xFF) * a / oa;
+            int bb = (px[i] & 0xFF) * a / oa;
+            px[i] = (oa << 24) | (rr << 16) | (gg << 8) | bb;
+        }
     }
 
     /** The TYRE icon: rounded box, corner radius a third of the short side, 2 px edge, 22 % inside. */
