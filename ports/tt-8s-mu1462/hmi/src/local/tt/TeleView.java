@@ -80,12 +80,13 @@ public final class TeleView implements Runnable {
     // (2026-11-25: the third is the themed notch glow, same loader)
     private static final File[] CAR_FILES = {new File(DIR, "hx-car-up.rgba"), new File(DIR, "hx-car-side.rgba"),
         new File(DIR, "notch-glow.rgba"), new File(DIR, "sp-chibi-white.rgba"), new File(DIR, "sp-chibi-doll.rgba"),
-        new File(DIR, "sp-bloom.rgba"), new File(DIR, "sp-emblem.rgba")};
+        new File(DIR, "sp-bloom.rgba"), new File(DIR, "sp-emblem.rgba"), new File(DIR, "sp-bloom-hot.rgba")};
     private static final int[][] CAR_SIZE = {{TeleLayout.CAR_UP_W, TeleLayout.CAR_UP_H},
         {TeleLayout.CAR_SIDE_W, TeleLayout.CAR_SIDE_H}, {TeleLayout.NOTCH_GLOW_W, TeleLayout.NOTCH_GLOW_H},
         {TeleLayout.SP_WHITE_W, TeleLayout.SP_WHITE_H}, {TeleLayout.SP_DOLL_W, TeleLayout.SP_DOLL_H},
-        {TeleLayout.SP_BLOOM_S, TeleLayout.SP_BLOOM_S}, {TeleLayout.SP_EMBLEM_S, TeleLayout.SP_EMBLEM_S}};
-    private static final byte[][] CAR = new byte[7][];
+        {TeleLayout.SP_BLOOM_S, TeleLayout.SP_BLOOM_S}, {TeleLayout.SP_EMBLEM_S, TeleLayout.SP_EMBLEM_S},
+        {TeleLayout.SP_BLOOM_S, TeleLayout.SP_BLOOM_S}};
+    private static final byte[][] CAR = new byte[8][];
     private static boolean carTried;
     /** tele21: the painted strip's pictures (track, lit, lit red), simulator export, read once. */
     private static final File[] STRIP_FILES = {new File(DIR, "strip-track.rgba"), new File(DIR, "strip-lit.rgba"),
@@ -258,7 +259,8 @@ public final class TeleView implements Runnable {
                         layout.carArt = carLoaded();
                         layout.glowArt = CAR[TeleLayout.NOTCH_GLOW] != null;
                         layout.chibiArt = CAR[TeleLayout.SP_WHITE] != null && CAR[TeleLayout.SP_DOLL] != null;
-                        layout.bloomArt = CAR[TeleLayout.SP_BLOOM] != null && CAR[TeleLayout.SP_EMBLEM] != null;
+                        layout.bloomArt = CAR[TeleLayout.SP_BLOOM] != null && CAR[TeleLayout.SP_EMBLEM] != null
+                            && CAR[TeleLayout.SP_BLOOM_HOT] != null;
                         layout.paintedStrip = stripLoaded();
                         layout.overflow = false;
                         layout.build(view, UI.page());

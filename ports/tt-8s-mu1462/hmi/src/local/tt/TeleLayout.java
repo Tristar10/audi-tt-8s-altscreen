@@ -77,9 +77,12 @@ public final class TeleLayout {
     public static final int SP_EMBLEM_S = 340;
     static final int BLOOM_CX = 236;
     static final int BLOOM_CY = 282;
-    static final int BLOOM_RX = 250;
-    static final int BLOOM_RY = 205;
+    static final int BLOOM_RX = 290;
+    static final int BLOOM_RY = 236;
     static final int BLOOM_FROM = 4500;
+    /** The bright layer inside the dark one (user: the Viper goes from dark to bright red). */
+    public static final int SP_BLOOM_HOT = 7;
+    static final int BLOOM_HOT_FROM = 5300;
     /** Picture sizes on the screen (the files on the car are exactly these). */
     public static final int CAR_UP_W = 128;
     public static final int CAR_UP_H = 264;
@@ -797,6 +800,13 @@ public final class TeleLayout {
             int bh = Math.max(8, (int) Math.round(2 * BLOOM_RY * k));
             int bi = add(IMAGE, BLOOM_CX - bw / 2, BLOOM_CY - bh / 2, bw, bh, WHITE, t > 0);
             size[bi] = SP_BLOOM;
+            // the bright layer: starts later, catches up with the dark one at the shift point
+            double th = link ? Math.max(0, Math.min(1, (rpm - BLOOM_HOT_FROM) / (double) (shiftRpm - BLOOM_HOT_FROM))) : 0;
+            double kh = over ? (blink ? 1.0 : 0.9) : 0.15 + 0.85 * th;
+            int hw = Math.max(8, (int) Math.round(2 * BLOOM_RX * kh));
+            int hh = Math.max(8, (int) Math.round(2 * BLOOM_RY * kh));
+            int hi = add(IMAGE, BLOOM_CX - hw / 2, BLOOM_CY - hh / 2, hw, hh, WHITE, th > 0);
+            size[hi] = SP_BLOOM_HOT;
             int ei = add(IMAGE, BLOOM_CX - SP_EMBLEM_S / 2, BLOOM_CY - SP_EMBLEM_S / 2, SP_EMBLEM_S, SP_EMBLEM_S, WHITE, true);
             size[ei] = SP_EMBLEM;
         }
