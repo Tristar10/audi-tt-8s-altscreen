@@ -128,6 +128,10 @@ public final class TeleLayout {
     public static final int CH_LOCK_SET = 23;
     /** DSG launch control active, 0/1 (GETRIEBE_14 GE_LaunchControl; OpenHaldex v1.1.22). */
     public static final int CH_LAUNCH = 24;
+    /** The board's launch detector (OpenHaldex v1.1.23): 0 idle, 1 armed, 2 running, 3 done, 4 aborted. */
+    public static final int CH_LSTATE = 25;
+    /** Seconds x1000: running time while ch 25 = 2, the 0-100 km/h result while 3 (held 30 s). */
+    public static final int CH_LTIME = 26;
 
     public static final int BG = 0x000000FF;
     public static final int PANEL = 0x0B0F14FF;
@@ -685,11 +689,54 @@ public final class TeleLayout {
         return launchOn;
     }
 
+    /**
+     * The same banner while the board times the launch: "x.xx s" counting while running (amber),
+     * then "0-100  x.xx s" in green (the board holds it 30 s).
+     */
+    private void launchTimed(boolean large, boolean done, int ms) {
+        int c = done ? LAUNCH_GO : LAUNCH_AMBER;
+        int cx = large ? 720 : 250;
+        int cy = large ? 312 : 282;
+        int w = large ? 640 : 380;
+        int h = large ? 80 : 70;
+        int sk = large ? 22 : 18;
+        int x0 = cx - w / 2;
+        int x1 = cx + w / 2;
+        int y0 = cy - h / 2;
+        int y1 = cy + h / 2;
+        quad(x0 + sk - 9, y0 - 9, x1 + sk + 9, y0 - 9, x1 - sk + 9, y1 + 9, x0 - sk - 9, y1 + 9, (c & 0xFFFFFF00) | 0x40, true);
+        quad(x0 + sk, y0, x1 + sk, y0, x1 - sk, y1, x0 - sk, y1, 0x05060CEE, true);
+        thick(x0 + sk, y0 + 1, x1 + sk, y0 + 1, 3, c, true);
+        thick(x0 - sk, y1 - 1, x1 - sk, y1 - 1, 3, c, true);
+        int cs = Math.max(0, ms) / 10; // hundredths
+        StringBuffer t = new StringBuffer();
+        t.append(cs / 100).append('.');
+        if (cs % 100 < 10)
+            t.append('0');
+        t.append(cs % 100).append(" s");
+        int ts = large ? 60 : 38;
+        text(cx, cy - (int) (ts * 0.6), ts, true, CENTER, done ? WHITE : c, t.toString(), true);
+        int sw2 = large ? 300 : 230;
+        box(cx - sw2 / 2, y1 + 5, sw2, large ? 26 : 24, 0x05060CD8, true);
+        text(cx, y1 + 7, large ? 18 : 16, true, CENTER, c, done ? "0-100 KM/H" : "LAUNCH  RUNNING", true);
+    }
+
     private void launchOverlay(boolean large) {
         int ped = ok(CH_PEDAL) ? clamp(r(val[CH_PEDAL]), 0, 100) : 0;
         double rb = ok(CH_BRAKE) ? Math.max(0, val[CH_BRAKE] / 1000.0) : 0;
         launchBrake += 0.3 * (rb - launchBrake);
-        if (!launchArmed(ped, (int) Math.round(launchBrake)))
+        // PROPOSAL (2026-11-25, needs the user's OK before a build): with the board's own detector
+        // (ch 25) the banner follows it, and shows the run time and the 0-100 result in the
+        // existing banner; without ch 25 nothing changes.
+        int lst = link && ok(CH_LSTATE) ? r(val[CH_LSTATE]) : -1;
+        if (lst >= 0) {
+            if (lst == 2 || lst == 3) {
+                launchTimed(large, lst == 3, ok(CH_LTIME) ? val[CH_LTIME] : 0);
+                return;
+            }
+            if (lst != 1)
+                return;
+        } else if (!launchArmed(ped, (int) Math.round(launchBrake)))
             return;
         int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
         boolean ready = act >= 90;
