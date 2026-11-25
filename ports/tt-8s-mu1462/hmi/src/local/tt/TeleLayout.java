@@ -831,12 +831,7 @@ public final class TeleLayout {
             size[ei] = SP_EMBLEM;
         }
         // the theme's two chibis (pictures, so the Haldex page can leave them out)
-        if (themed && chibiArt && page != PAGE_HALDEX) {
-            int ci = add(IMAGE, SP_WHITE_X, SP_WHITE_Y, SP_WHITE_W, SP_WHITE_H, WHITE, true);
-            size[ci] = SP_WHITE;
-            ci = add(IMAGE, SP_DOLL_X, SP_DOLL_Y, SP_DOLL_W, SP_DOLL_H, WHITE, true);
-            size[ci] = SP_DOLL;
-        }
+        // (the two chibis left Sport 2026-11-25, user: too crowded; the pictures stay unused)
         int na = 10;
         double aTop = 160;
         double aBot = 193;
@@ -863,28 +858,29 @@ public final class TeleLayout {
         // Haldex lock: icon, strip with the target tick, percent.
         int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
         int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
-        // (the Sport guide: bar shorter and percent further left, the white chibi is right of it)
-        // 2026-11-25 (user): the percent right-aligned with the temperatures below (x1), the bar
-        // running up to it; the white chibi moved further into the corner
-        int hbw = x1 - 104 - (x0 + 44);
-        icon(x0, 146, 32, TeleIcons.AWD, ICONC, true);
-        bar(x0 + 44, 157, hbw, 10, act, 0, link ? HALDEX : GREY, -1);
-        box(x0 + 44 + hbw * tgt / 100 - 1, 150, 2, 24, WHITE, ok(CH_HX_TARGET));
-        text(x1, 142, 36, false, RIGHT, vc, ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
+        // 2026-11-25 (user: too crowded): a shorter row centred in the space between the panel's
+        // top line and the gear, and between the frame and the arc (16 px margins: 52..473)
+        int hbw = 150;
+        int hx = 118; // icon 32 + 12 + bar + 14 + "100%" ~80, centred on x 262
+        icon(hx, 132, 32, TeleIcons.AWD, ICONC, true);
+        bar(hx + 44, 143, hbw, 10, act, 0, link ? HALDEX : GREY, -1);
+        box(hx + 44 + hbw * tgt / 100 - 1, 136, 2, 24, WHITE, ok(CH_HX_TARGET));
+        text(hx + 44 + hbw + 14 + 80, 128, 36, false, RIGHT, vc, ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
 
         // Gear, red past the shift point, flashing at the limiter; temperatures beside it.
         // with the bloom (red behind it) the gear stays white past the shift point and flashes
         // dark navy at the limiter; red on red did not read
         boolean bloomOn = themed && bloomArt;
         int gc = !link ? GREY : limit ? (blink ? (bloomOn ? 0x0A1030FF : RED) : WHITE) : over && !bloomOn ? RED : WHITE;
-        gearGlyph(132, 190, 170, gc);
-        text(132, 350, 22, true, CENTER, AMBER, "NO LINK", !link);
-        box(222, 192, 2, 196, LINE, true);
+        // 2026-11-25 (user): the gear a little smaller and right, the icons nearer their values
+        gearGlyph(152, 192, 156, gc);
+        text(152, 352, 22, true, CENTER, AMBER, "NO LINK", !link);
+        box(244, 192, 2, 168, LINE, true); // ends above AUTOCROSS
         int row = 0;
         for (int t = 0; t < T_CH.length; t++) {
             if (T_CH[t] == CH_OIL)
                 continue; // the stock Sport view shows oil temperature
-            tempCell(t, 240, x1, 192 + row * 50, 34, 36, rpm);
+            tempCell(t, 276, x1, 190 + row * 56, 30, 32, rpm); // 32 px, rows 56 apart
             row++;
         }
 
