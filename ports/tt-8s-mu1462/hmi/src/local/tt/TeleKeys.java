@@ -36,6 +36,11 @@ final class TeleKeys extends BaseJobFilter {
     /** /tmp/tt-tele-keys-off: no default wheel map (only an explicit key map, if any). */
     private static final File NO_DEFAULTS = new File("/tmp/tt-tele-keys-off");
     private static volatile boolean noDefaults;
+    /** /tmp/tt-tele-keys-pass: the car gets every key again, as before tele30. */
+    private static final File PASS = new File("/tmp/tt-tele-keys-pass");
+    private static volatile boolean pass;
+    /** Per key (0: 17, 1: 15): the press was kept from the car, so its release is too. */
+    private static final boolean[] held = new boolean[2];
     private static final File MAP_RAM = new File("/tmp/tt-tele-keymap");
     private static final File MAP_FLASH = new File("/mnt/app/root/tt/tele-keymap");
     private static volatile int[][] keymap = new int[0][];
@@ -75,6 +80,7 @@ final class TeleKeys extends BaseJobFilter {
     static void readSwitches() {
         trace = TRACE.exists();
         noDefaults = NO_DEFAULTS.exists();
+        pass = PASS.exists();
         int c = readCode(CODE_RAM);
         toggleCode = c >= 0 ? c : readCode(CODE_FLASH);
         int[][] km = readMap(MAP_RAM);
@@ -82,7 +88,36 @@ final class TeleKeys extends BaseJobFilter {
     }
 
     public void enqueue(Job job, int prio) {
-        super.enqueue(job, prio); // the stock handling first, unchanged
+        // tele30 (user 2026-11-25: the wheel also clicked things on the hidden map): while our view
+        // is on screen, the wheel's press (17) and roll (20) are ours and the car does not get
+        // them; Back (15) is ours only while the pop-up is open. Decided at the press and kept
+        // until the release, so the car never sees half a click. Off with /tmp/tt-tele-keys-pass.
+        boolean mine = false;
+        try {
+            Object p0 = job == null ? null : job.getPayload();
+            if (p0 instanceof KeyEvent && !pass) {
+                KeyEvent k0 = (KeyEvent) p0;
+                int code = k0.getKeyCode();
+                int id = k0.getID();
+                if (code == 17 || code == 15) {
+                    int slot = code == 17 ? 0 : 1;
+                    if (id == KeyEvent.KEY_PRESSED) {
+                        held[slot] = code == 17 ? TeleView.showing() : TeleView.showing() && TeleView.uiOpen();
+                    }
+                    mine = held[slot];
+                    if (id == KeyEvent.KEY_RELEASED) {
+                        held[slot] = false;
+                    }
+                } else if (code == 20) {
+                    mine = TeleView.showing();
+                }
+            }
+        } catch (Throwable t) {
+            mine = false;
+        }
+        if (!mine) {
+            super.enqueue(job, prio); // the stock handling, unchanged
+        }
         try {
             Object p = job == null ? null : job.getPayload();
             if (!(p instanceof KeyEvent)) {

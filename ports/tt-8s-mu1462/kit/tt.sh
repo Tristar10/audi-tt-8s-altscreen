@@ -605,6 +605,8 @@ tele)
         keys) case "${3:-}" in
                trace) touch /tmp/tt-tele-keys; say 'Key trace on: press the wheel buttons, then: grep "tele key" /tmp/tt-rgd.log | tail -30';;
                notrace) rm -f /tmp/tt-tele-keys; say 'Key trace off.';;
+               pass) touch /tmp/tt-tele-keys-pass; say 'The car gets every wheel key again (also behind the view), until restart.';;
+               own) rm -f /tmp/tt-tele-keys-pass; say 'While the view is on screen, the wheel press and roll go only to the view (default).';;
                toggle) case "${4:-}" in
                          [0-9]*) echo "$4" > /tmp/tt-tele-key-code; say "Double press of key $4 now switches the view (until restart; flash: sh tt.sh tele keys save $4).";;
                          *) say 'Usage: sh tt.sh tele keys toggle CODE'; exit 2;; esac;;
@@ -612,7 +614,7 @@ tele)
                          [0-9]*) rw; echo "$4" > $K/tele-key-code; ro; echo "$4" > /tmp/tt-tele-key-code; say "Key $4 saved as the view toggle (every start).";;
                          *) say 'Usage: sh tt.sh tele keys save CODE'; exit 2;; esac;;
                off) rm -f /tmp/tt-tele-key-code; rw; rm -f $K/tele-key-code; ro; say 'No toggle key.';;
-               *) say 'Usage: sh tt.sh tele keys trace | notrace | toggle CODE | save CODE | off'; exit 2;; esac;;
+               *) say 'Usage: sh tt.sh tele keys trace | notrace | pass | own | toggle CODE | save CODE | off'; exit 2;; esac;;
         probe) case "${3:-on}" in
                on|grp) echo grp > /tmp/tt-tele-probe; say 'Strip probe on (clip on a group). For the sweep: sh tt.sh tele demo on';;
                img) echo img > /tmp/tt-tele-probe; say 'Strip probe on (clip on the picture). For the sweep: sh tt.sh tele demo on';;

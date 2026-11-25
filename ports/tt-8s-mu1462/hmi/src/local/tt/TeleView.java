@@ -1164,6 +1164,11 @@ public final class TeleView implements Runnable {
         return UI.isOpen();
     }
 
+    /** Our view is on screen right now (on, on the map tab, and shown). */
+    static boolean showing() {
+        return on && mapNow && shownVisible;
+    }
+
     public static boolean press() {
         long now = System.currentTimeMillis();
         if (UI.isOpen()) {
