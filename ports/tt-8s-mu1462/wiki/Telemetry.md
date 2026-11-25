@@ -165,7 +165,17 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele25)
+## Autocross view on the head unit (tt-zoom tele26)
+
+tele26 (2026-11-25, jar sha256 55e1ad4b…410c): tele25 plus
+- **Launch banner**, floating over the unchanged screen (live and Haldex page): armed at brake
+  >= 50 bar (ch 21) and throttle >= 30 % (ch 3) while stopped (ch 2 < 3 km/h); off under 40 bar /
+  20 % / over 5 km/h. Amber while armed, green and pulsing once the lock is >= 90 %.
+- `sh tt.sh tele check` (read-only pre-flight: jar hash, pictures, switches, hotspot clients via
+  uaputl, link and frame-rate lines, recent errors) and `sh tt.sh tele stats` (log lines).
+- Same 11 pictures as tele25.
+
+### tele25
 
 tele25 (2026-11-25, jar sha256 6f0ed20b…7784), all renders approved in the simulator first:
 - Visible areas from the user's clipping guides (sim `ref/`); in Sport only the left panel is ours.
