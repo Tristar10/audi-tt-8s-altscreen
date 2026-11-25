@@ -182,7 +182,7 @@ tele25 (2026-11-25, jar sha256 6f0ed20b…7784), all renders approved in the sim
 - Classic: fender arches back, portraits clear of the Haldex readout, chibis beside the dials,
   thicker frames, the notch glow picture (`notch-glow.rgba`).
 - Haldex page: app-style see-through tyres flush with the body (TYRE icon, steering), clutch
-  plates, the torque split at the tail and nose (rear = lock / 2), a LOCK row; Sport: a lock bar,
+  plates, the torque split at the tail and nose (rear = min(lock, 50), nominal: lock is the coupling target, 5050 = 100), a LOCK row; Sport: a lock bar,
   the split beside the axles, the boost row.
 - Sport: shift lights replaced by a red bloom from 4500 rpm (`sp-bloom.rgba`, bright layer
   `sp-bloom-hot.rgba` from 5300) with the user's line art (`sp-emblem.rgba`, shown from 5300) and a

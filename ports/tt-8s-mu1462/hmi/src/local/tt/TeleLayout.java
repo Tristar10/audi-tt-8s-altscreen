@@ -126,6 +126,8 @@ public final class TeleLayout {
     public static final int CH_MODE = 12;
     /** Manual lock setpoint %, 255 when not in MANUAL (board v1.1.21). */
     public static final int CH_LOCK_SET = 23;
+    /** DSG launch control active, 0/1 (GETRIEBE_14 GE_LaunchControl; OpenHaldex v1.1.22). */
+    public static final int CH_LAUNCH = 24;
 
     public static final int BG = 0x000000FF;
     public static final int PANEL = 0x0B0F14FF;
@@ -644,6 +646,12 @@ public final class TeleLayout {
 
     private boolean launchArmed(int ped, int brk) {
         int spd = ok(CH_SPEED) ? r(val[CH_SPEED]) : 0;
+        // the car's own launch control (ch 24, board v1.1.22) decides when it is sent; the
+        // brake / throttle guess only without it
+        if (link && ok(CH_LAUNCH)) {
+            launchOn = val[CH_LAUNCH] >= 500 && spd <= 5;
+            return launchOn;
+        }
         if (!link || !ok(CH_PEDAL) || !ok(CH_BRAKE)) {
             launchOn = false;
         } else if (launchOn) {
@@ -1283,13 +1291,13 @@ public final class TeleLayout {
 
     /**
      * Classic's torque share beside the sideways car: the rear share at its tail, the front share
-     * at its nose. Not sent by the board: taken from the lock as a Haldex splits it, the rear
-     * getting up to half (0 % lock = 100:0 front, 100 % = 50:50).
+     * at its nose. Not sent by the board: the nominal rear share is min(lock, 50) (board session
+     * 2026-11-25: lock is the coupling target, 5050 = 100, 6040 = 40, 7030 = 30, ..., FWD = 0).
      */
     private void torqueSplit() {
         int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
         boolean have = link && ok(CH_HX_ACTUAL);
-        int rear = (act + 1) / 2;
+        int rear = Math.min(act, 50);
         int front = 100 - rear;
         int rc = !have ? GREY : rear > 0 ? rearColour(act) : GREY;
         int rx, ry, fx, fy, ns, cs;
