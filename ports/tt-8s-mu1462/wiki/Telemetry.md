@@ -165,7 +165,20 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele22)
+## Autocross view on the head unit (tt-zoom tele23)
+
+**Stock dials measured** (user 2026-11-24: in the themed photos the theme's arches did not sit around
+the dials and the dials covered the panel's edges). Measured on the themed Classic photo with our
+own elements as the ruler (the strip's flat corners at x 335 / 1067, y 136..204; the gear notch as
+a check): photo px = 872 + 1.223 (x - 335), about 1.19 vertically, 0.9 degrees tilt. The dials'
+outer chrome rings come out at centres (237, 389) and (1208, 390), radius about 115: taken as
+**235 / 1205, y 389, radius 116**, symmetric about x 720 (the simulator had 205 / 1235, radius 128).
+Applied to the simulator's mask, drawn cockpit, skin layers and the theme's arches and panel
+(now x 354..1086); the clip check then found the overlaps and tele23 fixes them: the temperature
+row 362..1078, boost bar 8 px pitch, the Haldex page's car and stats moved in.
+
+### Earlier: tele22
+
 
 **Clip check** (simulator, `java -cp out local.tt.ClipCheck [margin]`): builds Classic and Sport,
 live and Haldex page, with and without the pop-up, at idle, mid and redline, with both strip kinds,

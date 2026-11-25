@@ -174,8 +174,10 @@ public final class TeleLayout {
     private static final int NOTCH_SLOPE = 30;
     private static final int NOTCH_Y = 324 + D_Y;
     // Temperature row between the dials, under the notch.
-    private static final int GRID_X0 = 340; // centred on x 720 (was 330..1090)
-    private static final int GRID_X1 = 1100;
+    // tele23: the stock dials measured on a car photo (centres 235 / 1205, y 389, radius 116) reach
+    // in further than estimated; the row stays clear of them, centred on x 720
+    private static final int GRID_X0 = 362;
+    private static final int GRID_X1 = 1078;
     private static final int GRID_Y = 362 + D_Y;
 
     // Settings
@@ -477,9 +479,9 @@ public final class TeleLayout {
 
         if (hxPage) {
             // car sideways, nose to the right; gauge and stats to its right; the gear small in the corner
-            drivetrain(344, 230, 400, 196, true);
-            lockRing(860, 316, 62, 16);
-            hxStats(944, 238, 1100);
+            drivetrain(366, 230, 400, 196, true);
+            lockRing(866, 316, 62, 16);
+            hxStats(948, 238, 1074);
             gearGlyph(1082, 236, 44, gc);
             return;
         }
@@ -516,8 +518,8 @@ public final class TeleLayout {
         // a scale bracket under it (-1, 0, +1.5 bar). Fixed boxes: only their colour changes.
         // FL5-thick (user 2026-11-24): 25 tall stripes of 10 kPa, 46 px high
         int segN = 25;
-        int pitch = 9;
-        int bx = 874;
+        int pitch = 8; // tele23: narrower, clear of the speedometer
+        int bx = 866;
         int by = 278;
         int bh = 46;
         int bwAll = segN * pitch - 2;
