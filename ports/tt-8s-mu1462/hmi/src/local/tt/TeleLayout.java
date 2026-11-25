@@ -827,7 +827,8 @@ public final class TeleLayout {
             int hh = Math.max(8, (int) Math.round(2 * BLOOM_RY * kh));
             int hi = add(IMAGE, BLOOM_CX - hw / 2, BLOOM_CY - hh / 2, hw, hh, WHITE, th > 0);
             size[hi] = SP_BLOOM_HOT;
-            int ei = add(IMAGE, BLOOM_CX - SP_EMBLEM_S / 2, BLOOM_CY - SP_EMBLEM_S / 2, SP_EMBLEM_S, SP_EMBLEM_S, WHITE, true);
+            // the sketch only with the bright layer, from BLOOM_HOT_FROM (user 2026-11-25: hidden at low rpm)
+            int ei = add(IMAGE, BLOOM_CX - SP_EMBLEM_S / 2, BLOOM_CY - SP_EMBLEM_S / 2, SP_EMBLEM_S, SP_EMBLEM_S, WHITE, th > 0 || over);
             size[ei] = SP_EMBLEM;
         }
         // the theme's two chibis (pictures, so the Haldex page can leave them out)
