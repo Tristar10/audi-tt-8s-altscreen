@@ -6,6 +6,8 @@ package local.tt;
  */
 final class TeleFrame {
     boolean show;
+    /** tele31: only create the pictures' nodes, hidden; show nothing, render nothing. */
+    boolean warm;
     int key;
     int count;
     int[] kind;

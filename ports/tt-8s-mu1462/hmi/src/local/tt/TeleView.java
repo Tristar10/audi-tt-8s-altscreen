@@ -285,9 +285,15 @@ public final class TeleView implements Runnable {
                 if (f.sameAs(last) && !needMore) {
                     if (show && probeMode < 0) {
                         prewarm(now);
+                        if (warmRev(now, layout, last)) {
+                            continue; // a warm job is in flight
+                        }
+                    } else {
+                        idleSince = 0;
                     }
                     continue;
                 }
+                idleSince = 0;
                 EALManager m = TtPanel.ealManager();
                 if (m == null) {
                     continue;
@@ -323,6 +329,133 @@ public final class TeleView implements Runnable {
         boolean blink = (now / 100) % 2 == 0;
         boolean lit = layout.link && !(rpm >= layout.limitRpm && !blink);
         return TeleFrame.probe(probeMode, rpm, TeleStrip.cutX(layout, rpm), lit);
+    }
+
+    // ---------------------------------------------------------------- rev pre-warm (tele31)
+    // User 2026-11-25: the first run to the redline in each gear was laggy: every piece that
+    // changes colour on the way up (strip, shift lights, notch, gear, frame flash) had its picture
+    // painted and its node made the first time it showed. While the view stands still for 1 s,
+    // the frames of a rev to the limiter (both flash phases) are built from the current values,
+    // their pictures painted and their nodes made hidden: a few per job, nothing shown, no render.
+    // Done once per view / page / rotation; stops as soon as anything changes on screen.
+    private static final int[] WARM_RPM = {2000, 3000, 4000, 4500, 5000, 5500, 5800, 6100, 6300, 6400, 6500,
+        6600, 6700, 6800, 6900, 7000};
+    private static final int WARM_UPLOADS = 8;
+    private static final java.util.Hashtable WARM_DONE = new java.util.Hashtable();
+    private static TeleLayout warmLayout;
+    private static int warmKey = Integer.MIN_VALUE;
+    private static int warmStep;
+    private static long idleSince;
+
+    /** One warm step if due; true when a warm job was posted. Tick thread. */
+    private static boolean warmRev(long now, TeleLayout cur, TeleFrame shown) {
+        if (shown == null || !shown.show || shown.probe || pending || (shown.key & 2) != 0) {
+            return false; // nothing on screen yet, a job in flight, or the pop-up is open
+        }
+        if (idleSince == 0) {
+            idleSince = now;
+            return false;
+        }
+        if (now - idleSince < 1000L) {
+            return false;
+        }
+        Integer k = new Integer(shown.key);
+        if (WARM_DONE.containsKey(k)) {
+            return false;
+        }
+        if (warmKey != shown.key) {
+            warmKey = shown.key;
+            warmStep = 0;
+        }
+        if (warmStep >= WARM_RPM.length * 2) {
+            WARM_DONE.put(k, k);
+            RgdBus.note(new StringBuffer("tele warm: rev frames ready for view ").append(shown.key & 1)
+                .append(" page ").append((shown.key >> 2) & 3).toString());
+            return false;
+        }
+        if (warmLayout == null) {
+            warmLayout = new TeleLayout();
+        }
+        TeleLayout w = warmLayout;
+        System.arraycopy(cur.val, 0, w.val, 0, cur.val.length);
+        System.arraycopy(cur.has, 0, w.has, 0, cur.has.length);
+        w.link = true;
+        w.rateHz = cur.rateHz;
+        w.themed = cur.themed;
+        w.carArt = cur.carArt;
+        w.glowArt = cur.glowArt;
+        w.chibiArt = cur.chibiArt;
+        w.bloomArt = cur.bloomArt;
+        w.shadows = cur.shadows;
+        w.paintedStrip = cur.paintedStrip;
+        w.testData = cur.testData;
+        int rpm = WARM_RPM[warmStep / 2];
+        w.val[TeleLayout.CH_RPM] = rpm * 1000;
+        w.has[TeleLayout.CH_RPM] = true;
+        w.now = (now / 200) * 200 + (warmStep % 2 == 0 ? 0 : 100); // both flash phases
+        w.overflow = false;
+        w.build((shown.key & 1) != 0 ? TeleLayout.VIEW_SMALL : TeleLayout.VIEW_LARGE, (shown.key >> 2) & 3);
+        warmStep++;
+        TeleFrame f = TeleFrame.of(w, shown.key);
+        if (f.count != shown.count) {
+            return false; // a different set of slots (would rebuild the view): skip this state
+        }
+        f.theme = shown.theme;
+        f.warm = true;
+        prepareArt(f);
+        EALManager m = TtPanel.ealManager();
+        if (m == null) {
+            return false;
+        }
+        pending = true;
+        postedAt = now;
+        try {
+            m.getTerminal().getFramework().getHMIService().getEventDispatcher().postEvent(
+                new RunnableEvent(new TeleJob(m, f)));
+        } catch (Throwable t) {
+            pending = false;
+            return false;
+        }
+        return true;
+    }
+
+    /** HMI thread: makes the nodes of a warm frame's pictures, hidden, a few per job. */
+    private static String warmOnHmi(EALManager m, TeleFrame f) {
+        if (slots == null || f.key != builtKey || slots.length != f.count || builtRotGen != rotGen) {
+            return null;
+        }
+        int made = 0;
+        for (int i = 1; i < f.count && made < WARM_UPLOADS; i++) {
+            if (!f.vis[i] || f.kind[i] == TeleLayout.TEXT || (f.kind[i] == TeleLayout.BOX && (f.w[i] <= 0 || f.h[i] <= 0))) {
+                continue;
+            }
+            TeleSlot s = slots[i];
+            if (s.group == null || s.nImgs >= TeleSlot.MAX_COLOURS) {
+                continue;
+            }
+            Long kk = artKey(f, i);
+            long key = kk == null ? f.rgba[i] : kk.longValue();
+            boolean have = false;
+            for (int j = 0; j < s.nImgs; j++) {
+                if (s.keys[j] == key) {
+                    have = true;
+                }
+            }
+            if (have) {
+                continue;
+            }
+            IWrappedNode3DImage img = upload(m, s, f, i);
+            if (img == null) {
+                continue;
+            }
+            img.setVisible(false);
+            s.keys[s.nImgs] = key;
+            s.colours[s.nImgs] = f.rgba[i];
+            s.imgs[s.nImgs] = img;
+            s.nImgs++;
+            made++;
+        }
+        return null;
     }
 
     private static TeleLayout other;
@@ -738,6 +871,9 @@ public final class TeleView implements Runnable {
             }
             note = new StringBuffer("viewport ").append(m.getScreenWidth()).append('x').append(m.getScreenHeight())
                 .toString();
+        }
+        if (f.warm) {
+            return warmOnHmi(m, f);
         }
         if (f.probe) {
             String r = probeOnHmi(m, f);
