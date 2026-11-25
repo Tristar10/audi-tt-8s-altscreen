@@ -301,6 +301,8 @@ public final class TeleLayout {
             liveLarge();
         else
             liveSmall();
+        if (page != PAGE_PRESETS)
+            launchOverlay(large); // floats over the page; the page itself is unchanged
         if (uiOpen && page != PAGE_PRESETS)
             popup(large);
     }
@@ -625,6 +627,90 @@ public final class TeleLayout {
                 box(cx0, GRID_Y + 4, 1, 24, LINE, true);
             tempCell(t, cx0 + 12, cx0 + cw - 12, GRID_Y, 30, 32, rpm);
         }
+    }
+
+    // ---------------------------------------------------------------- launch banner (2026-11-25)
+    // User: when launch control is set up (brake at least half, throttle at least 30 %), a
+    // floating, dramatic message over the screen; the screen under it stays as it is. Armed while
+    // stopped with brake >= 50 bar and throttle >= 30 %; stays until under 40 bar / 20 % / rolling
+    // over 5 km/h (no flicker). Amber while armed, green and pulsing once the Haldex is locked
+    // (>= 90 %). Fixed shapes, only colours change per frame (cheap on the car).
+    static final int LAUNCH_BRAKE = 50;
+    static final int LAUNCH_PEDAL = 30;
+    static final int LAUNCH_AMBER = 0xFFB020FF;
+    static final int LAUNCH_GO = 0x3CE08AFF;
+    private boolean launchOn;
+    private double launchBrake;
+
+    private boolean launchArmed(int ped, int brk) {
+        int spd = ok(CH_SPEED) ? r(val[CH_SPEED]) : 0;
+        if (!link || !ok(CH_PEDAL) || !ok(CH_BRAKE)) {
+            launchOn = false;
+        } else if (launchOn) {
+            launchOn = brk >= LAUNCH_BRAKE - 10 && ped >= LAUNCH_PEDAL - 10 && spd <= 5;
+        } else {
+            launchOn = brk >= LAUNCH_BRAKE && ped >= LAUNCH_PEDAL && spd < 3;
+        }
+        return launchOn;
+    }
+
+    private void launchOverlay(boolean large) {
+        int ped = ok(CH_PEDAL) ? clamp(r(val[CH_PEDAL]), 0, 100) : 0;
+        double rb = ok(CH_BRAKE) ? Math.max(0, val[CH_BRAKE] / 1000.0) : 0;
+        launchBrake += 0.3 * (rb - launchBrake);
+        if (!launchArmed(ped, (int) Math.round(launchBrake)))
+            return;
+        int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
+        boolean ready = act >= 90;
+        int c = ready ? LAUNCH_GO : LAUNCH_AMBER;
+        boolean pulse = (now / 125) % 2 == 0;
+        int cx = large ? 720 : 250;
+        int cy = large ? 312 : 282; // Classic: the state line stays above the temperature row
+        int w = large ? 640 : 380;
+        int h = large ? 80 : 70;
+        int sk = large ? 22 : 18;
+        int x0 = cx - w / 2;
+        int x1 = cx + w / 2;
+        int y0 = cy - h / 2;
+        int y1 = cy + h / 2;
+        // halo (pulsing when ready), plate, bright edges top and bottom
+        int hg = 9;
+        quad(x0 + sk - hg, y0 - hg, x1 + sk + hg, y0 - hg, x1 - sk + hg, y1 + hg, x0 - sk - hg, y1 + hg,
+            (c & 0xFFFFFF00) | (ready && pulse ? 0x80 : 0x40), true);
+        quad(x0 + sk, y0, x1 + sk, y0, x1 - sk, y1, x0 - sk, y1, 0x05060CEE, true);
+        thick(x0 + sk, y0 + 1, x1 + sk, y0 + 1, 3, c, true);
+        thick(x0 - sk, y1 - 1, x1 - sk, y1 - 1, 3, c, true);
+        // hazard stripes at both ends, parallel to the slanted ends
+        int ns = large ? 5 : 3;
+        int sp = 14;
+        int sw = 7;
+        for (int i = 0; i < ns; i++) {
+            int a0 = x0 + 10 + i * sp;
+            quad(a0 + sk, y0 + 5, a0 + sk + sw, y0 + 5, a0 - sk + sw, y1 - 5, a0 - sk, y1 - 5, c, true);
+            int b0 = x1 - 10 - sw - i * sp;
+            quad(b0 + sk, y0 + 5, b0 + sk + sw, y0 + 5, b0 - sk + sw, y1 - 5, b0 - sk, y1 - 5, c, true);
+        }
+        // chevrons running in toward the word, one lit at a time
+        int nc = large ? 3 : 2;
+        int lit = (int) ((now / 110) % nc);
+        int cs = large ? 15 : 12;
+        int cw0 = large ? 12 : 10;
+        for (int i = 0; i < nc; i++) {
+            int cc = i == lit ? c : (c & 0xFFFFFF00) | 0x55;
+            int lx = x0 + 12 + ns * sp + 6 + i * (large ? 26 : 16);
+            thick(lx, cy - cs, lx + cw0, cy, 5, cc, true);
+            thick(lx + cw0, cy, lx, cy + cs, 5, cc, true);
+            int rx = x1 - 12 - ns * sp - 6 - i * (large ? 26 : 16);
+            thick(rx, cy - cs, rx - cw0, cy, 5, cc, true);
+            thick(rx - cw0, cy, rx, cy + cs, 5, cc, true);
+        }
+        int ts = large ? 60 : 38;
+        text(cx, cy - (int) (ts * 0.6), ts, true, CENTER, ready && !pulse ? WHITE : c, "LAUNCH", true);
+        // the state under the plate
+        String st = new StringBuffer(ready ? "READY" : "ARMED").append("   LOCK ").append(act).append('%').toString();
+        int sw2 = large ? 300 : 230;
+        box(cx - sw2 / 2, y1 + 5, sw2, large ? 26 : 24, 0x05060CD8, true);
+        text(cx, y1 + 7, large ? 18 : 16, true, CENTER, c, st, true);
     }
 
     /** Boost scheme: ice at zero, sakura at 0.9 bar, red at full boost. */
