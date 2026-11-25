@@ -861,7 +861,7 @@ public final class TeleLayout {
         // 2026-11-25 (user: too crowded): a shorter row centred in the space between the panel's
         // top line and the gear, and between the frame and the arc (16 px margins: 52..473)
         int hbw = 150;
-        int hx = 118; // icon 32 + 12 + bar + 14 + "100%" ~80, centred on x 262
+        int hx = 142; // icon 32 + 12 + bar + 14 + "100%" ~80; 24 px right of centre, the portrait is left of it
         icon(hx, 132, 32, TeleIcons.AWD, ICONC, true);
         bar(hx + 44, 143, hbw, 10, act, 0, link ? HALDEX : GREY, -1);
         box(hx + 44 + hbw * tgt / 100 - 1, 136, 2, 24, WHITE, ok(CH_HX_TARGET));
