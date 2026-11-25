@@ -509,9 +509,9 @@ public final class TeleLayout {
 
         if (hxPage) {
             // car sideways, nose to the right; gauge and stats to its right; the gear small in the corner
-            drivetrain(374, 230, 400, 196, true);
-            lockRing(866, 316, 62, 16);
-            hxStats(946, 238, 1058);
+            // 2026-11-25: no lock ring (the corner readout shows the lock); larger stats
+            drivetrain(378, 228, 440, 196, true);
+            hxStats(860, 236, 1000, 32, 60);
             gearGlyph(1044, 392, 32, gc); // tele24: inside the panel (crossed its right edge)
             return;
         }
@@ -583,6 +583,8 @@ public final class TeleLayout {
 
         // Temperatures in one row, an icon and a value in each cell, short dividers between.
         int cw = (GRID_X1 - GRID_X0) / T_CH.length;
+        // themed: the hairline over the row (was in the theme picture, which crossed the Haldex page's car)
+        box(GRID_X0 + 8, GRID_Y - 10, GRID_X1 - GRID_X0 - 16, 1, 0x3E8BFF8C, themed);
         for (int t = 0; t < T_CH.length; t++) {
             int cx0 = GRID_X0 + t * cw;
             if (t > 0)
@@ -780,7 +782,7 @@ public final class TeleLayout {
             // car upright in the left column; gauge and stats on the right
             drivetrain(70, 142, 160, 280, false);
             lockRing(320, 220, 56, 14);
-            hxStats(236, 296, 424);
+            hxStats(236, 296, 424, 24, 50);
             int gcS = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
             gearGlyph(398, 308, 44, gcS); // beside the stats, clear of the bottom row
         } else {
@@ -887,37 +889,74 @@ public final class TeleLayout {
         double cx = 0.495;
         double fy = 0.232;
         double ry = 0.788;
-        double cpl = ry - 0.045;
+        double cpl = ry - 0.07;
+        boolean driving = link && act > 0 && !off;
         int rc = !link ? 0x5A6270FF : rearColour(act);
         int fc = !link ? 0x6B7385FF : off ? 0xB4BECCFF : HX_ICE;
-        // axles and prop shaft, dark under-strokes keep them readable over the livery
-        seg(cx - 0.359, fy, cx + 0.359, fy, 4, fc);
-        seg(cx, fy, cx, cpl, 3, act > 0 && link ? rc : 0x6A7280FF);
-        seg(cx - 0.353, ry, cx + 0.353, ry, 4, rc);
-        // torque dashes travelling rearward, faster with more lock
-        int nd = 6;
+        // 2026-11-25 (user: too crude): solid parts with a dark casing, a cyan glow along the
+        // driven path (prop shaft, coupling, rear axle) while the coupling locks, tyres with a lit
+        // tread, differentials as discs, the coupling as a stack of clutch plates lighting up with
+        // the lock. The lock % is in the corner readout, not here.
+        double tl = 0.130 * cL;
+        double tw = 0.090 * cW;
+        double fx = 0.359;
+        double rx = 0.353;
+        // glow under the driven path
+        int glow = (rc & 0xFFFFFF00) | 0x48;
+        if (driving) {
+            seg0(cx, fy + 0.04, cx, ry, 14, glow);
+            seg0(cx - rx, ry, cx + rx, ry, 16, glow);
+        }
+        // front axle and the prop shaft, rear axle
+        seg(cx - fx, fy, cx + fx, fy, 6, fc);
+        seg(cx, fy, cx, cpl, 4, driving ? rc : 0x6A7280FF);
+        seg(cx, cpl, cx, ry, 5, rc);
+        seg(cx - rx, ry, cx + rx, ry, 6, rc);
+        // torque pills travelling rearward along the shaft, faster with more lock
+        int nd = 5;
         double speed = 0.4 + 1.2 * act / 100.0;
         double ph0 = (now % 100000L) / 1000.0 * speed;
         for (int k = 0; k < nd; k++) {
             double f = (ph0 + k / (double) nd) % 1.0;
-            int[] d = cpt(cx, fy + (cpl - fy) * f);
-            box(d[0] - 2, d[1] - 2, 4, 4, WHITE, link && act > 0 && !off);
+            int[] d = cpt(cx, fy + 0.05 + (cpl - 0.05 - fy - 0.05) * f);
+            if (carSide)
+                box(d[0] - 4, d[1] - 2, 8, 4, WHITE, driving);
+            else
+                box(d[0] - 2, d[1] - 4, 4, 8, WHITE, driving);
         }
-        // coupling: a box filling with the lock
+        // differentials: a dark disc with a lit centre
+        for (int k = 0; k < 2; k++) {
+            int[] dp = cpt(cx, k == 0 ? fy : ry);
+            icon(dp[0] - 11, dp[1] - 11, 22, TeleIcons.DOT, 0x05091CFF, true);
+            icon(dp[0] - 7, dp[1] - 7, 14, TeleIcons.DOT, k == 0 ? fc : rc, true);
+        }
+        // the coupling: a dark housing and six clutch plates across the shaft, lit with the lock
         int[] c = cpt(cx, cpl);
-        box(c[0] - 13, c[1] - 10, 26, 20, rc, true);
-        box(c[0] - 11, c[1] - 8, 22, 16, HX_NAVY, true);
-        box(c[0] - 9, c[1] - 6, 18 * act / 100, 12, HX_CYAN, link && act > 0);
-        // tyres (0.105 x 0.140 of the picture): front turned with the steering
-        double tl = 0.140 * cL;
-        double tw = 0.105 * cW;
-        tyre(cx - 0.359, fy, road, tl, tw, fc);
-        tyre(cx + 0.359, fy, road, tl, tw, fc);
-        tyre(cx - 0.353, ry, 0, tl, tw, rc);
-        tyre(cx + 0.353, ry, 0, tl, tw, rc);
-        // lock tag behind the rear axle, and the state tag
-        int[] t = cpt(cx, ry + 0.07);
-        text(t[0], t[1] - 9, 14, true, CENTER, HX_ICE, percent(act), link && act > 0);
+        int hl = 40; // along the shaft
+        int hw = 26; // across
+        int plates = 6;
+        int lit = link ? (act * plates + 99) / 100 : 0;
+        if (carSide) {
+            box(c[0] - hl / 2 - 2, c[1] - hw / 2 - 2, hl + 4, hw + 4, rc, true);
+            box(c[0] - hl / 2, c[1] - hw / 2, hl, hw, HX_NAVY, true);
+        } else {
+            box(c[0] - hw / 2 - 2, c[1] - hl / 2 - 2, hw + 4, hl + 4, rc, true);
+            box(c[0] - hw / 2, c[1] - hl / 2, hw, hl, HX_NAVY, true);
+        }
+        for (int k = 0; k < plates; k++) {
+            int o = -hl / 2 + 5 + k * (hl - 10) / (plates - 1);
+            boolean on = k < lit;
+            int pc = on ? mix(HX_BLUE, HX_CYAN, (k + 1) / (float) plates) : 0x2A3346FF;
+            if (carSide)
+                box(c[0] - o - 1, c[1] - hw / 2 + 4, 3, hw - 8, pc, true);
+            else
+                box(c[0] - hw / 2 + 4, c[1] + o - 1, hw - 8, 3, pc, true);
+        }
+        // tyres: front turned with the steering
+        tyre(cx - fx, fy, road, tl, tw, fc);
+        tyre(cx + fx, fy, road, tl, tw, fc);
+        tyre(cx - rx, ry, 0, tl, tw, rc);
+        tyre(cx + rx, ry, 0, tl, tw, rc);
         String tag = !link ? "NOT CONNECTED" : off ? "STOCK CONTROL" : null;
         text(side ? bx + 8 : bx + bw / 2, side ? by + 2 : by + bh - 16, 13, true, side ? LEFT : CENTER,
             !link ? HX_PINK : HX_ICE, tag, tag != null);
@@ -944,6 +983,13 @@ public final class TeleLayout {
         box(x, y, Math.abs(q[0] - p[0]), Math.abs(q[1] - p[1]), c, true);
     }
 
+    /** A segment without the dark casing (the glow). */
+    private void seg0(double u0, double v0, double u1, double v1, int t, int c) {
+        int[] p = cpt(u0, v0);
+        int[] q = cpt(u1, v1);
+        thick(p[0], p[1], q[0], q[1], t, c, true);
+    }
+
     private void seg(double u0, double v0, double u1, double v1, int t, int c) {
         int[] p = cpt(u0, v0);
         int[] q = cpt(u1, v1);
@@ -951,30 +997,22 @@ public final class TeleLayout {
         thick(p[0], p[1], q[0], q[1], t, c, true);
     }
 
-    /** A tyre centred at (u, v), turned by deg (clockwise seen from above): an outline, 2.5 px. */
+    /**
+     * A tyre centred at (u, v), turned by deg (clockwise seen from above): dark rubber with a thin
+     * edge in c, and a lit tread band down its middle in c.
+     */
     private void tyre(double u, double v, double deg, double tl, double tw, int c) {
         int[] p = cpt(u, v);
         double ang = carSide ? deg : deg - 90; // the tyre runs along the car
         double rad = Math.toRadians(ang);
         double ax = Math.cos(rad);
         double ay = Math.sin(rad);
-        double nx = -ay;
-        double ny = ax;
         double sx = p[0] - ax * tl / 2;
         double sy = p[1] - ay * tl / 2;
-        double t = 2.5;
-        // long sides
-        rbox(sx + nx * (tw / 2 - t / 2), sy + ny * (tw / 2 - t / 2), tl, t, ang, c, true);
-        rbox(sx - nx * (tw / 2 - t / 2), sy - ny * (tw / 2 - t / 2), tl, t, ang, c, true);
-        // ends
-        rbox(sx, sy, t, tw, ang, c, true);
-        rbox(sx + ax * (tl - t), sy + ay * (tl - t), t, tw, ang, c, true);
+        rbox(sx - ax, sy - ay, tl + 2, tw + 2, ang, (c & 0xFFFFFF00) | 0xA0, true);
+        rbox(sx, sy, tl, tw, ang, 0x0A0E18FF, true);
+        rbox(sx + ax * 5, sy + ay * 5, tl - 10, Math.max(3, tw * 0.28), ang, c, true);
     }
-
-
-
-
-
 
     /** The lock ring: 270 degrees open at the bottom, 30 segments, the target as a pink dot. */
     private void lockRing(int cx, int cy, int r, int thick) {
@@ -1012,28 +1050,31 @@ public final class TeleLayout {
             cx + rd(Math.cos(r0) * rIn), cy - rd(Math.sin(r0) * rIn), c, v);
     }
 
-    /** TARGET, STEERING, CLUTCH: label over value, in a column from x0 to x1 starting at y0. */
-    private void hxStats(int x0, int y0, int x1) {
+    /** TARGET, STEERING, CLUTCH: label over value (vs px), rows rg apart, from x0 to x1 at y0. */
+    private void hxStats(int x0, int y0, int x1, int vs, int rg) {
         int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
         int vc = link ? WHITE : GREY;
-        text(x0, y0, 12, true, LEFT, GREY, "TARGET", true);
-        box(x0, y0 + 26, 6, 6, HX_PINK, link);
-        text(x0 + 12, y0 + 16, 24, true, LEFT, vc, ok(CH_HX_TARGET) ? percent(tgt) : "-", true);
-        text(x0, y0 + 50, 12, true, LEFT, GREY, "STEERING", true);
+        int ls = vs >= 30 ? 13 : 12;
+        int vy = ls + 4;
+        text(x0, y0, ls, true, LEFT, GREY, "TARGET", true);
+        box(x0, y0 + vy + vs / 2 - 3, 7, 7, HX_PINK, link);
+        text(x0 + 14, y0 + vy, vs, true, LEFT, vc, ok(CH_HX_TARGET) ? percent(tgt) : "-", true);
+        text(x0, y0 + rg, ls, true, LEFT, GREY, "STEERING", true);
         String st = "-";
         if (ok(CH_STEER)) {
             int d = r(val[CH_STEER]);
             st = new StringBuffer(d > 0 ? "+" : "").append(d).append('°').toString();
         }
-        text(x0, y0 + 66, 24, true, LEFT, vc, st, true);
+        text(x0, y0 + rg + vy, vs, true, LEFT, vc, st, true);
         int ct = ok(CH_CLUTCH) ? r(val[CH_CLUTCH]) : -1;
         boolean hot = ct >= 90;
-        text(x0, y0 + 100, 12, true, LEFT, GREY, "CLUTCH", true);
-        text(x0, y0 + 116, 24, true, LEFT, hot ? HX_PINK : vc, ct >= 0 ? temp(ct) : "-", true);
+        text(x0, y0 + 2 * rg, ls, true, LEFT, GREY, "CLUTCH", true);
+        text(x0, y0 + 2 * rg + vy, vs, true, LEFT, hot ? HX_PINK : vc, ct >= 0 ? temp(ct) : "-", true);
         int bw = x1 - x0 - 4;
-        box(x0, y0 + 146, bw, 6, HX_IDLE, true);
-        box(x0 + bw * 90 / 120, y0 + 144, 2, 10, 0xFF548F60, true);
-        box(x0, y0 + 146, ct > 0 ? Math.max(6, bw * Math.min(ct, 120) / 120) : 0, 6, hot ? HX_PINK : HX_CYAN, ct > 0);
+        int by = y0 + 2 * rg + vy + vs + 8;
+        box(x0, by, bw, 6, HX_IDLE, true);
+        box(x0 + bw * 90 / 120, by - 2, 2, 10, 0xFF548F60, true);
+        box(x0, by, ct > 0 ? Math.max(6, bw * Math.min(ct, 120) / 120) : 0, 6, hot ? HX_PINK : HX_CYAN, ct > 0);
     }
 
     /** A line from (ax,ay) to (bx,by), w px thick, as a quad (a little longer to close joints). */
