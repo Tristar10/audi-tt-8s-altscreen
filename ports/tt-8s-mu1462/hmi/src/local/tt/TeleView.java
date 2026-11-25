@@ -1016,7 +1016,8 @@ public final class TeleView implements Runnable {
         }
         // Icons tilt only when rotation is on; turned boxes (rev strip pieces) always turn.
         boolean box = f.kind[i] == TeleLayout.BOX;
-        boolean always = box || (f.kind[i] == TeleLayout.ICON && f.size[i] == TeleIcons.ARCQ);
+        boolean always = box || (f.kind[i] == TeleLayout.ICON
+            && (f.size[i] == TeleIcons.ARCQ || f.size[i] == TeleIcons.TYRE)); // tyres steer
         float rot = always || (f.kind[i] == TeleLayout.ICON && !rotOff) ? f.rot[i] : 0f;
         if (f.x[i] != s.sx || f.y[i] != s.sy || f.w[i] != s.sw || f.h[i] != s.sh || rot != s.shownRot) {
             float uw = img.getUnscaledWidth();

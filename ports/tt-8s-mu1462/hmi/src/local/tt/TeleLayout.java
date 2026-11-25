@@ -886,7 +886,7 @@ public final class TeleLayout {
             car(0.08, 0.02, 0.92, 0.98, 0x0B1430FF);
             car(0.20, 0.33, 0.80, 0.47, 0x13204AFF);
         }
-        double cx = 0.495;
+        double cx = 0.499;
         double fy = 0.232;
         double ry = 0.788;
         double cpl = ry - 0.07;
@@ -897,21 +897,24 @@ public final class TeleLayout {
         // driven path (prop shaft, coupling, rear axle) while the coupling locks, tyres with a lit
         // tread, differentials as discs, the coupling as a stack of clutch plates lighting up with
         // the lock. The lock % is in the corner readout, not here.
-        double tl = 0.130 * cL;
-        double tw = 0.090 * cW;
-        double fx = 0.359;
-        double rx = 0.353;
+        // wheels inside the body, outer edge flush with its side, as in the app (user 2026-11-25;
+        // the body measured on the car picture: 0.093 .. 0.905 of its width at both axles)
+        double tl = 0.150 * cL;
+        double tw = 0.130 * cW;
+        double fx = 0.340;
+        double rx = 0.335;
+        double ti = 0.5 * 0.130 + 0.012; // axles stop at the tyre's inner edge (fraction of the width)
         // glow under the driven path
         int glow = (rc & 0xFFFFFF00) | 0x48;
         if (driving) {
             seg0(cx, fy + 0.04, cx, ry, 14, glow);
-            seg0(cx - rx, ry, cx + rx, ry, 16, glow);
+            seg0(cx - rx + ti, ry, cx + rx - ti, ry, 16, glow);
         }
         // front axle and the prop shaft, rear axle
-        seg(cx - fx, fy, cx + fx, fy, 6, fc);
+        seg(cx - fx + ti, fy, cx + fx - ti, fy, 6, fc);
         seg(cx, fy, cx, cpl, 4, driving ? rc : 0x6A7280FF);
         seg(cx, cpl, cx, ry, 5, rc);
-        seg(cx - rx, ry, cx + rx, ry, 6, rc);
+        seg(cx - rx + ti, ry, cx + rx - ti, ry, 6, rc);
         // torque pills travelling rearward along the shaft, faster with more lock
         int nd = 5;
         double speed = 0.4 + 1.2 * act / 100.0;
@@ -998,8 +1001,9 @@ public final class TeleLayout {
     }
 
     /**
-     * A tyre centred at (u, v), turned by deg (clockwise seen from above): dark rubber with a thin
-     * edge in c, and a lit tread band down its middle in c.
+     * A tyre centred at (u, v), turned by deg (clockwise seen from above), as in the app: the TYRE
+     * icon (see-through rounded box with a solid edge in c), tl along the car, tw across, turned
+     * about its top-left corner so its centre stays on the wheel.
      */
     private void tyre(double u, double v, double deg, double tl, double tw, int c) {
         int[] p = cpt(u, v);
@@ -1007,11 +1011,14 @@ public final class TeleLayout {
         double rad = Math.toRadians(ang);
         double ax = Math.cos(rad);
         double ay = Math.sin(rad);
-        double sx = p[0] - ax * tl / 2;
-        double sy = p[1] - ay * tl / 2;
-        rbox(sx - ax, sy - ay, tl + 2, tw + 2, ang, (c & 0xFFFFFF00) | 0xA0, true);
-        rbox(sx, sy, tl, tw, ang, 0x0A0E18FF, true);
-        rbox(sx + ax * 5, sy + ay * 5, tl - 10, Math.max(3, tw * 0.28), ang, c, true);
+        int w = (int) Math.round(tl);
+        int h = (int) Math.round(tw);
+        // top-left = centre - R(ang) * (w/2, h/2)
+        double tx = p[0] - (ax * w / 2 - ay * h / 2);
+        double ty = p[1] - (ay * w / 2 + ax * h / 2);
+        int i = add(ICON, rd(tx), rd(ty), w, h, c, true);
+        size[i] = TeleIcons.TYRE;
+        rot[i] = (float) ang;
     }
 
     /** The lock ring: 270 degrees open at the bottom, 30 segments, the target as a pink dot. */

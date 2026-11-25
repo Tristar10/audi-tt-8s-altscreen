@@ -28,7 +28,12 @@ public final class TeleIcons {
     public static final int RING = 12;
     /** A filled dot with a dark rim (the Haldex page's target marker). */
     public static final int DOT = 13;
-    public static final int COUNT = 14;
+    /**
+     * A tyre seen from above, as in the OpenHaldex app (2026-11-25): a rounded box, see-through
+     * (22 %) inside a solid 2 px edge. Drawn in pixels at its own w x h (not the 0..100 grid).
+     */
+    public static final int TYRE = 14;
+    public static final int COUNT = 15;
 
     // Shape ops. CAP x0 y0 x1 y1 r (thick line, round ends) | CIRC x y r | RECT x0 y0 x1 y1 |
     // POLY n x0 y0 ... | CUT_CIRC x y r | CUT_RECT x0 y0 x1 y1 | CUT_POLY n x0 y0 ...
@@ -90,6 +95,8 @@ public final class TeleIcons {
         {CIRC, 50, 50, 50, CUT_CIRC, 50, 50, 49},
         // DOT
         {CIRC, 50, 50, 46},
+        // TYRE: drawn by tyre()
+        {},
     };
 
     /**
@@ -159,6 +166,8 @@ public final class TeleIcons {
 
     /** Pixels, ARGB, w * h; the 0..100 grid is scaled to the height (glyphs are narrower). */
     public static int[] argb(int id, int w, int h, int rgb) {
+        if (id == TYRE)
+            return tyre(w, h, rgb);
         float[] ops = id >= GLYPH ? GLYPHS[id - GLYPH] : ICONS[id];
         int[] out = new int[w * h];
         int ss = 4;
@@ -176,6 +185,36 @@ public final class TeleIcons {
                 }
                 int a = hits * 255 / (ss * ss);
                 out[py * w + pxl] = (a << 24) | (rgb & 0xFFFFFF);
+            }
+        }
+        return out;
+    }
+
+    /** The TYRE icon: rounded box, corner radius a third of the short side, 2 px edge, 22 % inside. */
+    private static int[] tyre(int w, int h, int rgb) {
+        int[] out = new int[w * h];
+        float rr = Math.min(w, h) / 3f;
+        float edge = 2f;
+        int ss = 4;
+        for (int py = 0; py < h; py++) {
+            for (int px = 0; px < w; px++) {
+                float a = 0;
+                for (int sy = 0; sy < ss; sy++) {
+                    for (int sx = 0; sx < ss; sx++) {
+                        float u = px + (sx + 0.5f) / ss;
+                        float v = py + (sy + 0.5f) / ss;
+                        // signed distance to the rounded box (negative inside)
+                        float qx = Math.abs(u - w / 2f) - (w / 2f - rr);
+                        float qy = Math.abs(v - h / 2f) - (h / 2f - rr);
+                        float ox = Math.max(qx, 0);
+                        float oy = Math.max(qy, 0);
+                        float d = (float) Math.sqrt(ox * ox + oy * oy) + Math.min(Math.max(qx, qy), 0) - rr;
+                        if (d <= 0)
+                            a += d > -edge ? 1f : 0.22f;
+                    }
+                }
+                int al = Math.round(a * 255 / (ss * ss));
+                out[py * w + px] = (al << 24) | (rgb & 0xFFFFFF);
             }
         }
         return out;
