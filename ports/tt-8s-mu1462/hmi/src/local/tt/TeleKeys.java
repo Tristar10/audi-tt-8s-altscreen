@@ -39,6 +39,11 @@ final class TeleKeys extends BaseJobFilter {
     private static final File MAP_RAM = new File("/tmp/tt-tele-keymap");
     private static final File MAP_FLASH = new File("/mnt/app/root/tt/tele-keymap");
     private static volatile int[][] keymap = new int[0][];
+    /** tele29: holding the wheel press this long opens the pop-up (on release). */
+    private static final long HOLD_MS = 700L;
+    private static long downAt;
+    private static boolean longDone;
+    private static boolean openAtDown;
 
     private TeleKeys() {
     }
@@ -101,9 +106,27 @@ final class TeleKeys extends BaseJobFilter {
             if (keymap.length == 0 && !noDefaults) {
                 int code = k.getKeyCode();
                 if (code == 17 && id == KeyEvent.KEY_PRESSED) {
+                    // tele29: remember when, so a hold can open the pop-up on release (the car did
+                    // not send KEY_LONG_PRESSED on 2026-11-25, only pressed/released)
+                    downAt = System.currentTimeMillis();
+                    longDone = false;
+                    openAtDown = TeleView.uiOpen();
                     TeleView.press();
                 } else if (code == 17 && id == KeyEvent.KEY_LONG_PRESSED) {
-                    TeleUi.post(TeleUi.OPEN);
+                    if (!longDone && !openAtDown) {
+                        longDone = true;
+                        TeleUi.post(TeleUi.OPEN);
+                    }
+                } else if (code == 17 && id == KeyEvent.KEY_RELEASED) {
+                    long held = downAt > 0 ? System.currentTimeMillis() - downAt : 0;
+                    if (held >= HOLD_MS && !longDone && !openAtDown) {
+                        TeleUi.post(TeleUi.OPEN);
+                        if (trace) {
+                            RgdBus.note(new StringBuffer("tele key 17 held ").append(held).append(" ms: pop-up").toString());
+                        }
+                    }
+                    downAt = 0;
+                    longDone = false;
                 } else if (code == 20 && id == KeyEvent.KEY_TURNED && TeleView.isOn()) {
                     TeleUi.post(dir == WheelButtonEvent.TURN_UP ? TeleUi.UP : TeleUi.DOWN);
                 } else if (code == 15 && id == KeyEvent.KEY_PRESSED && TeleView.uiOpen()) {
