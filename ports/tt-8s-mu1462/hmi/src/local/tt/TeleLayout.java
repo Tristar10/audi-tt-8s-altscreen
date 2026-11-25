@@ -704,43 +704,17 @@ public final class TeleLayout {
 
 
     /**
-     * The Sport view's panel outline, tracing what the cluster lets through (user 2026-11-24): the
-     * frame's diagonal top-left, under the stock status line, down the right side and around the
-     * big rev counter (centre 791,288; 8 px outside its 290 px ring), along the bottom. Shared
-     * with the theme's housing and the redline warning frame.
+     * The Sport view's panel outline: the user's Sport clipping guide (sim ref/sport-clip-guide.svg,
+     * 2026-11-24) shrunk 8 px inwards, left of the big rev counter (centre 720,309, r 264), cut
+     * straight at y 106 under the status strip notch (printed by the sim's OutlinePts, then the thin
+     * sliver between the notch and the dial dropped). Clockwise from the top right: along the top,
+     * the notch's left corner, the bezel down the left side, the bottom strip, up the dial's ring.
+     * Shared with the theme's housing and the redline warning frame.
      */
-    static final int[] SP_X;
-    static final int[] SP_Y;
-
-    static {
-        int[] xs = new int[24];
-        int[] ys = new int[24];
-        int n = 0;
-        xs[n] = 30;
-        ys[n++] = 112;
-        xs[n] = 184;
-        ys[n++] = 74;
-        xs[n] = 512;
-        ys[n++] = 74;
-        for (int y = 183; y <= 393; y += 30) {
-            int dy = y - 288;
-            xs[n] = (int) Math.round(791 - Math.sqrt(298.0 * 298.0 - dy * dy));
-            ys[n++] = y;
-        }
-        xs[n] = 512;
-        ys[n++] = 446;
-        // the frame's curve up the left side (tele21: content was clipped there on the car)
-        int[] lx = {112, 92, 76, 62, 50, 40, 34};
-        int[] ly = {446, 420, 392, 362, 320, 260, 180};
-        for (int k = 0; k < lx.length; k++) {
-            xs[n] = lx[k];
-            ys[n++] = ly[k];
-        }
-        SP_X = new int[n];
-        SP_Y = new int[n];
-        System.arraycopy(xs, 0, SP_X, 0, n);
-        System.arraycopy(ys, 0, SP_Y, 0, n);
-    }
+    static final int[] SP_X = {541, 215, 194, 176, 93, 40, 19, 16, 28, 57, 74, 96, 124, 155, 490, 465, 451, 449,
+        458, 478, 507};
+    static final int[] SP_Y = {106, 106, 98, 84, 113, 145, 169, 184, 275, 373, 409, 440, 452, 455, 455, 404, 349,
+        290, 235, 185, 140};
 
     private void liveSmall() {
         // Only the map area left of the big rev counter shows (SP_X/SP_Y). From the top: Haldex
@@ -758,8 +732,9 @@ public final class TeleLayout {
         // Redline warning, under everything else: a red tint over the panel, flashing with the
         // shift lights (a fixed shape, only shown or hidden).
         boolean warn = over && blink;
-        box(34, 120, 460, 300, 0xFF3B3030, warn);
-        quad(30, 120, 184, 74, 494, 74, 494, 120, 0xFF3B3030, warn);
+        box(28, 106, 420, 349, 0xFF3B3030, warn); // the bezel and the dial cover what lies outside SP_X/SP_Y
+        quad(448, 106, 541, 106, 458, 235, 448, 290, 0xFF3B3030, warn); // up to the dial's ring
+        quad(448, 290, 451, 349, 490, 455, 448, 455, 0xFF3B3030, warn);
 
         // Shift lights along the panel's top (user 2026-11-24, in place of the hazard band): ten
         // glass segments lighting left to right over the last 1200 rpm, mint, cobalt, red, then all
@@ -767,8 +742,8 @@ public final class TeleLayout {
         int nl = 10;
         int lw = 18;
         int lgap = 4;
-        int lx = 200;
-        int lyt = 90; // tele15: everything lower, the top was against the frame
+        int lx = 150; // the Sport guide: left of the white chibi in the top-right corner
+        int lyt = 110; // the Sport guide: under the status strip notch (y 96..98)
         int lh = 26; // tele16: thicker
         for (int i = 0; i < nl; i++) {
             int on = shiftRpm - (nl - i) * 120;
@@ -782,48 +757,49 @@ public final class TeleLayout {
 
         if (page == PAGE_HALDEX) {
             // car upright in the left column; gauge and stats on the right
-            drivetrain(70, 132, 160, 280, false);
-            lockRing(320, 212, 56, 14);
-            hxStats(236, 288, 424);
+            drivetrain(70, 142, 160, 280, false);
+            lockRing(320, 220, 56, 14);
+            hxStats(236, 296, 424);
             int gcS = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
-            gearGlyph(398, 300, 44, gcS); // beside the stats, clear of the bottom row
+            gearGlyph(398, 308, 44, gcS); // beside the stats, clear of the bottom row
         } else {
         // Haldex lock: icon, strip with the target tick, percent.
         int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
         int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
-        icon(x0, 138, 32, TeleIcons.AWD, ICONC, true);
-        bar(x0 + 44, 149, 250, 10, act, 0, link ? HALDEX : GREY, -1);
-        box(x0 + 44 + 250 * tgt / 100 - 1, 142, 2, 24, WHITE, ok(CH_HX_TARGET));
-        text(x1, 134, 36, false, RIGHT, vc, ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
+        // (the Sport guide: bar shorter and percent further left, the white chibi is right of it)
+        icon(x0, 146, 32, TeleIcons.AWD, ICONC, true);
+        bar(x0 + 44, 157, 206, 10, act, 0, link ? HALDEX : GREY, -1);
+        box(x0 + 44 + 206 * tgt / 100 - 1, 150, 2, 24, WHITE, ok(CH_HX_TARGET));
+        text(x1 - 34, 142, 36, false, RIGHT, vc, ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
 
         // Gear, red past the shift point, flashing at the limiter; temperatures beside it.
         int gc = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
-        gearGlyph(132, 182, 170, gc);
-        text(132, 342, 22, true, CENTER, AMBER, "NO LINK", !link);
-        box(222, 184, 2, 196, LINE, true);
+        gearGlyph(132, 190, 170, gc);
+        text(132, 350, 22, true, CENTER, AMBER, "NO LINK", !link);
+        box(222, 192, 2, 196, LINE, true);
         int row = 0;
         for (int t = 0; t < T_CH.length; t++) {
             if (T_CH[t] == CH_OIL)
                 continue; // the stock Sport view shows oil temperature
-            tempCell(t, 240, x1, 184 + row * 50, 34, 36, rpm);
+            tempCell(t, 240, x1, 192 + row * 50, 34, 36, rpm);
             row++;
         }
 
         // Preset and mode under the gear; Wi-Fi warning beside them while the link is slow or lost.
-        text(84, 366, 28, false, LEFT, link ? PRESET : GREY, presetName(), true);
-        text(96, 396, 15, true, LEFT, GREY, presetMode(), true);
+        text(84, 374, 28, false, LEFT, link ? PRESET : GREY, presetName(), true);
+        text(96, 404, 15, true, LEFT, GREY, presetMode(), true);
         boolean slow = link && rateHz >= 0 && rateHz < 10;
-        icon(190, 372, 22, TeleIcons.WIFI, AMBER, !link || slow);
+        icon(190, 380, 22, TeleIcons.WIFI, AMBER, !link || slow);
 
         // Boost: icon, strip from vacuum to boost with zero marked, value in bar.
         int kpa = ok(CH_BOOST) ? r(val[CH_BOOST]) : 0;
         boolean boosting = link && kpa > 0;
         int zero = (0 - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN);
         int pos = clamp((kpa - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN), 0, 100);
-        icon(118, 414, 24, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
-        bar(150, 424, 192, 10, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
-        text(x1 - 36, 410, 32, false, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
-        text(x1, 424, 14, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
+        icon(118, 420, 24, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
+        bar(150, 430, 192, 10, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
+        text(x1 - 36, 416, 32, false, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
+        text(x1, 430, 14, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
         }
 
         // Redline warning frame on top: a thick red line along the panel outline with a glow,
@@ -1232,7 +1208,7 @@ public final class TeleLayout {
         int cx = large ? 720 : 269;
         int x0 = large ? 470 : 98; // Sport: clear of the frame's curve (ClipCheck)
         int x1 = large ? 970 : 440;
-        int y0 = large ? 112 : 108;
+        int y0 = large ? 112 : 116; // Sport: top corner clear of the bezel curve (the Sport guide)
         int rowH = large ? 74 : 76; // Sport: card ends above the frame's bottom-left curve (ClipCheck)
         box(0, 0, SCREEN_W, SCREEN_H, 0x000000B0, true); // dim the view
         box(x0, y0, x1 - x0, 46 + 3 * rowH + 40, 0x08102AF2, true);
