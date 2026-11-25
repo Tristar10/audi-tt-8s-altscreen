@@ -61,8 +61,8 @@ public final class TeleLayout {
     public static final int NOTCH_GLOW_H = 124;
     /** Sport's theme chibis (2026-11-25): live page only. White-haired top right, doll bottom right. */
     public static final int SP_WHITE = 3;
-    public static final int SP_WHITE_X = 390;
-    public static final int SP_WHITE_Y = 100;
+    public static final int SP_WHITE_X = 428;
+    public static final int SP_WHITE_Y = 104;
     public static final int SP_WHITE_W = 69;
     public static final int SP_WHITE_H = 96;
     public static final int SP_DOLL = 4;
@@ -864,10 +864,13 @@ public final class TeleLayout {
         int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
         int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
         // (the Sport guide: bar shorter and percent further left, the white chibi is right of it)
+        // 2026-11-25 (user): the percent right-aligned with the temperatures below (x1), the bar
+        // running up to it; the white chibi moved further into the corner
+        int hbw = x1 - 104 - (x0 + 44);
         icon(x0, 146, 32, TeleIcons.AWD, ICONC, true);
-        bar(x0 + 44, 157, 206, 10, act, 0, link ? HALDEX : GREY, -1);
-        box(x0 + 44 + 206 * tgt / 100 - 1, 150, 2, 24, WHITE, ok(CH_HX_TARGET));
-        text(x1 - 34, 142, 36, false, RIGHT, vc, ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
+        bar(x0 + 44, 157, hbw, 10, act, 0, link ? HALDEX : GREY, -1);
+        box(x0 + 44 + hbw * tgt / 100 - 1, 150, 2, 24, WHITE, ok(CH_HX_TARGET));
+        text(x1, 142, 36, false, RIGHT, vc, ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
 
         // Gear, red past the shift point, flashing at the limiter; temperatures beside it.
         // with the bloom (red behind it) the gear stays white past the shift point and flashes
