@@ -517,6 +517,26 @@ tele)
                       *) shift 3; : > /tmp/tt-tele-keymap; for l in "$@"; do echo "$l" >> /tmp/tt-tele-keymap; done; say "Key map (RAM):"; cat /tmp/tt-tele-keymap;; esac;;
                savemap) if test -f /tmp/tt-tele-keymap; then rw; cp /tmp/tt-tele-keymap $K/tele-keymap; ro; say 'Key map saved to flash.'; else say 'No key map in RAM: sh tt.sh tele ui map ... first.'; exit 1; fi;;
                *) say 'Usage: sh tt.sh tele ui open | up | down | press | back | close | map "CODE EVENT ACTION"... | savemap'; exit 2;; esac;;
+        stats) # frames per second, build times, link counters: the head unit logs a line every few seconds
+               if test -f /tmp/tt-rgd.log; then grep "tele stats\|tele rx\|tele link\|lost" /tmp/tt-rgd.log | tail -${3:-8}
+               else say 'No /tmp/tt-rgd.log yet (the view writes it once it runs).'; fi;;
+        check) # read-only pre-flight for a short test (2026-11-25): changes nothing
+               say '== jar'; $T $JAR 2>/dev/null || say "no $JAR"
+               say '== pictures (name, bytes; missing ones are skipped by the view)'
+               for f in theme-classic theme-sport hx-car-up hx-car-side strip-track strip-lit strip-red notch-glow sp-bloom sp-bloom-hot sp-emblem; do
+                   if test -f $K/$f.rgba; then say "  $f $(ls -l $K/$f.rgba | awk '{print $5}')"; else say "  $f MISSING"; fi
+               done
+               say '== switches'
+               for f in tt-tele-on tt-tele-off tt-tele-demo tt-tele-theme tt-tele-glide tt-tele-shadows-off tt-tele-keys-off; do
+                   test -f /tmp/$f && say "  /tmp/$f"
+               done
+               for f in tele-theme tele-glide tele-shadows-off; do test -f $K/$f && say "  flash $K/$f"; done
+               say '== hotspot clients (the board should be listed)'
+               uaputl sta_list 2>/dev/null || say '  uaputl not found or no clients'
+               say '== link and frame rate (last lines)'
+               if test -f /tmp/tt-rgd.log; then grep "tele stats\|tele rx\|lost" /tmp/tt-rgd.log | tail -5; else say '  no /tmp/tt-rgd.log yet'; fi
+               say '== recent errors'
+               if test -f /tmp/tt-rgd.log; then grep -i "exception\|error\|failed" /tmp/tt-rgd.log | tail -5; fi;;
         shadows) case "${3:-}" in
                on) rm -f /tmp/tt-tele-shadows-off; if test -f $K/tele-shadows-off; then rw; rm -f $K/tele-shadows-off; ro; fi; say 'Shadows on (texts, icons, bars; within 1 s).';;
                off) touch /tmp/tt-tele-shadows-off; say 'Shadows off until the next start (compare with: sh tt.sh tele stats).';;
@@ -602,7 +622,7 @@ tele)
                on) rw; touch $K/tele-on; ro; say 'Autocross view on at every MMI start.';;
                off) rw; rm -f $K/tele-on; ro; say 'Autocross view no longer on at start.';;
                *) say 'Usage: sh tt.sh tele boot on | off'; exit 2;; esac;;
-        *) say 'Usage: sh tt.sh tele on | off | demo on|off | ui open|up|down|press|back|page | glide on|off|boot | pictures | theme on|off|boot|install | selftest | keys trace|toggle N|save N | beep N | shiftbeep N|off | sounds | probe on|img|off | rot deg|-deg|rad|-rad|off | boot on|off'
+        *) say 'Usage: sh tt.sh tele on | off | demo on|off | ui open|up|down|press|back|page | glide on|off|boot | pictures | theme on|off|boot|install | selftest | check | stats [N] | shadows on|off|boot-off | keys trace|toggle N|save N | beep N | shiftbeep N|off | sounds | probe on|img|off | rot deg|-deg|rad|-rad|off | boot on|off'
            say "   now: $(test -e /tmp/tt-tele-on && echo on || (test -e $K/tele-on && ! test -e /tmp/tt-tele-off && echo on || echo off)), demo $(test -e /tmp/tt-tele-demo && echo on || echo off), probe $(cat /tmp/tt-tele-probe 2>/dev/null || echo off), tilt $(cat /tmp/tt-tele-rot 2>/dev/null || echo -deg)"
            exit 2;;
     esac
