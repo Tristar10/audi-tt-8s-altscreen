@@ -807,7 +807,8 @@ public final class TeleLayout {
             drivetrain(70, 142, 160, 280, false);
             torqueSplit();
             lockBar(318, 146, 446);
-            hxStats(318, 236, 446, 28, 64, false);
+            hxStats(318, 236, 446, 28, 60, false);
+            boostSmall(416, link ? WHITE : GREY); // the same boost row as the live page (user 2026-11-25)
         } else {
         // Haldex lock: icon, strip with the target tick, percent.
         int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
@@ -837,15 +838,7 @@ public final class TeleLayout {
         boolean slow = link && rateHz >= 0 && rateHz < 10;
         icon(190, 380, 22, TeleIcons.WIFI, AMBER, !link || slow);
 
-        // Boost: icon, strip from vacuum to boost with zero marked, value in bar.
-        int kpa = ok(CH_BOOST) ? r(val[CH_BOOST]) : 0;
-        boolean boosting = link && kpa > 0;
-        int zero = (0 - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN);
-        int pos = clamp((kpa - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN), 0, 100);
-        icon(118, 420, 24, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
-        bar(150, 430, 192, 10, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
-        text(x1 - 36, 416, 32, false, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
-        text(x1, 430, 14, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
+        boostSmall(x1, vc);
         }
 
         // Redline warning frame on top: a thick red line along the panel outline with a glow,
@@ -855,6 +848,18 @@ public final class TeleLayout {
             thick(SP_X[k], SP_Y[k], SP_X[j], SP_Y[j], 18, 0xFF3B3050, warn);
             thick(SP_X[k], SP_Y[k], SP_X[j], SP_Y[j], 6, RED, warn);
         }
+    }
+
+    /** Sport's boost row along the panel's bottom: icon, strip from vacuum to boost with zero marked, value. */
+    private void boostSmall(int x1, int vc) {
+        int kpa = ok(CH_BOOST) ? r(val[CH_BOOST]) : 0;
+        boolean boosting = link && kpa > 0;
+        int zero = (0 - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN);
+        int pos = clamp((kpa - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN), 0, 100);
+        icon(118, 420, 24, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
+        bar(150, 430, 160, 10, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero); // clear of "-0.1"
+        text(x1 - 36, 416, 32, false, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
+        text(x1, 430, 14, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
     }
 
     // ---------------------------------------------------------------- Haldex page (tele19)
@@ -1154,14 +1159,14 @@ public final class TeleLayout {
             fx = carBox[0] + carBox[2] + 40;
             ry = midY;
             fy = midY;
-            ns = 30;
+            ns = 42;
             cs = 12;
         } else { // Sport: right of the car, beside each axle
             rx = carBox[0] + carBox[2] + 34;
             fx = rx;
             fy = cpt(0.5, 0.232)[1];
             ry = cpt(0.5, 0.788)[1];
-            ns = 28;
+            ns = 40;
             cs = 11;
         }
         text(rx, ry - ns + 4, ns, true, CENTER, have ? (rear > 0 ? HX_CYAN : WHITE) : GREY,
