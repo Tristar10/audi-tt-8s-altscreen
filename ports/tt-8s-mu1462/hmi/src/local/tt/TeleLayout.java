@@ -765,7 +765,7 @@ public final class TeleLayout {
             // car upright in the left column; gauge and stats on the right
             drivetrain(70, 132, 160, 280, false);
             lockRing(320, 212, 56, 14);
-            hxStats(236, 300, 424);
+            hxStats(236, 288, 424);
             int gcS = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
             gearGlyph(398, 388, 44, gcS);
         } else {
@@ -801,10 +801,10 @@ public final class TeleLayout {
         boolean boosting = link && kpa > 0;
         int zero = (0 - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN);
         int pos = clamp((kpa - BOOST_MIN) * 100 / (BOOST_MAX - BOOST_MIN), 0, 100);
-        icon(108, 418, 26, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
-        bar(142, 428, 200, 10, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
-        text(x1 - 36, 414, 32, false, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
-        text(x1, 428, 14, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
+        icon(118, 414, 24, TeleIcons.TURBO, boosting ? BOOST_FILL : ICONC, true);
+        bar(150, 424, 192, 10, pos, zero, !link ? GREY : kpa >= 0 ? boostColour(kpa) : VAC_FILL, zero);
+        text(x1 - 36, 410, 32, false, RIGHT, boosting ? WHITE : vc, ok(CH_BOOST) ? boost(kpa) : "-", true);
+        text(x1, 424, 14, true, RIGHT, GREY, boostPsi ? "PSI" : "BAR", true);
         }
 
         // Redline warning frame on top: a thick red line along the panel outline with a glow,
@@ -1210,11 +1210,11 @@ public final class TeleLayout {
      * panel.
      */
     private void popup(boolean large) {
-        int cx = large ? 720 : 226;
-        int x0 = large ? 470 : 22;
-        int x1 = large ? 970 : 430;
+        int cx = large ? 720 : 269;
+        int x0 = large ? 470 : 98; // Sport: clear of the frame's curve (ClipCheck)
+        int x1 = large ? 970 : 440;
         int y0 = large ? 112 : 108;
-        int rowH = large ? 74 : 82;
+        int rowH = large ? 74 : 76; // Sport: card ends above the frame's bottom-left curve (ClipCheck)
         box(0, 0, SCREEN_W, SCREEN_H, 0x000000B0, true); // dim the view
         box(x0, y0, x1 - x0, 46 + 3 * rowH + 40, 0x08102AF2, true);
         box(x0, y0, x1 - x0, 2, 0x2FD4FFFF, true);

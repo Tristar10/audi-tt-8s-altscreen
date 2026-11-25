@@ -165,7 +165,20 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele21)
+## Autocross view on the head unit (tt-zoom tele22)
+
+**Clip check** (simulator, `java -cp out local.tt.ClipCheck [margin]`): builds Classic and Sport,
+live and Haldex page, with and without the pop-up, at idle, mid and redline, with both strip kinds,
+and tests every element against the visible area (TeleSim.visible: the frame, stock dials, tab and
+status bars, the Sport curve measured on the car photos). It lists anything cut and exits 1. Skipped
+on purpose: backgrounds and tints, the Sport warning frame (drawn along the edge), the strip's ends
+under the frame. The head unit's screenshot does not include the cluster bezel, so the mask comes
+from photos and is only as exact as they are. tele22 fixes what it found, all in Sport: boost icon
+(touched the bottom-left curve), pop-up card (under the left curve and the bottom: now x 98..440,
+rows 76 px), Haldex page clutch bar (below the bottom edge).
+
+### Earlier: tele21
+
 
 First full car test (2026-11-24, tele20, selftest log and photos):
 - Worked: 24-29 frames/s, instant view switching after the first build (0.3 s), car pictures and
