@@ -165,7 +165,20 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele26)
+## Autocross view on the head unit (tt-zoom tele28)
+
+tele28 (2026-11-25 overnight, jar sha256 f07ace0e…263f) = tele26 plus, from the OpenHaldex board
+session (board v1.1.21 flashed; v1.1.22 ready, not flashed):
+- Torque split = min(lock, 50): lock % is the coupling target (5050 = 100, 6040 = 40, ..., FWD = 0).
+- Launch banner follows ch 24 (GETRIEBE_14 GE_LaunchControl, v1.1.22) when sent; otherwise the
+  brake/throttle rule. Hidden while the pop-up is open (worst case 370 of 400 slots).
+- TEST DATA tag (magenta, 1 Hz) while TTG1 flags bit 0 is set (the board's test pattern,
+  v1.1.22: 4 s held launch, then 16 s sweeps of every channel; app More > Wi-Fi, or TTC1 cmd 4).
+- Board facts: TTG1 at 20 Hz carries ch 1-8, 10-13, 16, 18, 20-23, 60-62 (+24); ch 19 only
+  while valid; brake not clamped (floor < 2 bar, clamp the display); no-gateway fallback .1 since
+  v1.1.16; port sweep 49153-49162 since v1.1.19.
+
+### tele26
 
 tele26 (2026-11-25, jar sha256 55e1ad4b…410c): tele25 plus
 - **Launch banner**, floating over the unchanged screen (live and Haldex page): armed at brake
