@@ -885,10 +885,11 @@ public final class TeleLayout {
         }
 
         // Preset and mode under the gear; Wi-Fi warning beside them while the link is slow or lost.
-        text(84, 374, 28, false, LEFT, link ? PRESET : GREY, presetName(), true);
-        text(96, 404, 15, true, LEFT, GREY, presetMode(), true);
+        // 2026-11-25 (user): smaller, centred under the gear
+        text(152, 366, 22, false, CENTER, link ? PRESET : GREY, presetName(), true);
+        text(152, 392, 13, true, CENTER, GREY, presetMode(), true);
         boolean slow = link && rateHz >= 0 && rateHz < 10;
-        icon(190, 380, 22, TeleIcons.WIFI, AMBER, !link || slow);
+        icon(222, 368, 20, TeleIcons.WIFI, AMBER, !link || slow);
 
         boostSmall(x1, vc);
         }
