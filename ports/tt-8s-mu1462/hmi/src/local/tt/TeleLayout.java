@@ -501,7 +501,7 @@ public final class TeleLayout {
         text(NOTCH_X0 - 8, 208 + D_Y, 34, true, RIGHT, AMBER, "NO LINK", !link);
         int ped = ok(CH_PEDAL) ? clamp(r(val[CH_PEDAL]), 0, 100) : 0;
         icon(GRID_X0 + 16, 254 + D_Y, 26, TeleIcons.PEDAL, ICONC, true);
-        bar(GRID_X0 + 54, 261 + D_Y, 126, 12, ped, 0, link ? PEDAL_FILL : GREY, -1);
+        bar(GRID_X0 + 54, 261 + D_Y, 100, 12, ped, 0, link ? PEDAL_FILL : GREY, -1);
         text(NOTCH_X0 - 8, 255 + D_Y, 24, false, RIGHT, vc, ok(CH_PEDAL) ? percent(ped) : "-", true);
         // Brake pressure smoothed (EMA at the 30 Hz tick) with a 2 bar dead band: the sensor reads
         // about 1 bar off the brakes (road test 2026-11-23).
@@ -509,7 +509,7 @@ public final class TeleLayout {
         brakeSm += 0.3 * (rawBrake - brakeSm);
         int brk = brakeSm < 2.0 ? 0 : clamp((int) Math.round(brakeSm), 0, 999);
         icon(GRID_X0 + 16, 288 + D_Y, 26, TeleIcons.BRAKE, brk > 0 && link ? BRAKE_FILL : ICONC, true);
-        bar(GRID_X0 + 54, 295 + D_Y, 126, 12, Math.min(brk, 100), 0, link ? BRAKE_FILL : GREY, -1);
+        bar(GRID_X0 + 54, 295 + D_Y, 100, 12, Math.min(brk, 100), 0, link ? BRAKE_FILL : GREY, -1);
         text(NOTCH_X0 - 8, 289 + D_Y, 24, false, RIGHT, vc, ok(CH_BRAKE) ? withUnit(brk, " bar") : "-", true);
 
         // Right of the notch: boost as a turbo-style arc. Segments sweep from vacuum (steel blue)
@@ -786,7 +786,7 @@ public final class TeleLayout {
             lockRing(320, 212, 56, 14);
             hxStats(236, 288, 424);
             int gcS = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
-            gearGlyph(398, 388, 44, gcS);
+            gearGlyph(398, 300, 44, gcS); // beside the stats, clear of the bottom row
         } else {
         // Haldex lock: icon, strip with the target tick, percent.
         int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
