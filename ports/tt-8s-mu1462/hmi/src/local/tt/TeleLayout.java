@@ -549,23 +549,28 @@ public final class TeleLayout {
             gearGlyph(408, 388, 34, gc); // bottom left, under the rear share
             return;
         }
-        // Left of the notch: rpm, and the driver's inputs under it: accelerator (green) and brake
-        // pressure (red, full bar at 100 bar).
-        icon(GRID_X0 + 14, 210 + D_Y, 32, TeleIcons.TACH, ICONC, true);
-        text(NOTCH_X0 - 8, 204 + D_Y, 40, false, RIGHT, over ? RED : vc, ok(CH_RPM) ? Integer.toString(rpm) : "-", link);
-        text(NOTCH_X0 - 8, 208 + D_Y, 34, true, RIGHT, AMBER, "NO LINK", !link);
-        int ped = ok(CH_PEDAL) ? clamp(r(val[CH_PEDAL]), 0, 100) : 0;
-        icon(GRID_X0 + 16, 254 + D_Y, 26, TeleIcons.PEDAL, ICONC, true);
-        bar(GRID_X0 + 54, 261 + D_Y, 70, 12, ped, 0, link ? PEDAL_FILL : GREY, -1);
-        text(NOTCH_X0 - 8, 255 + D_Y, 24, false, RIGHT, vc, ok(CH_PEDAL) ? percent(ped) : "-", true);
         // Brake pressure smoothed (EMA at the 30 Hz tick) with a 2 bar dead band: the sensor reads
         // about 1 bar off the brakes (road test 2026-11-23).
         double rawBrake = ok(CH_BRAKE) ? Math.max(0, val[CH_BRAKE] / 1000.0) : 0;
         brakeSm += 0.3 * (rawBrake - brakeSm);
         int brk = brakeSm < 2.0 ? 0 : clamp((int) Math.round(brakeSm), 0, 999);
+        int ped = ok(CH_PEDAL) ? clamp(r(val[CH_PEDAL]), 0, 100) : 0;
+        boolean la = launchArmed(ped, brk);
+        if (la) {
+            launchLeft(rpm, ped, brk);
+        } else {
+        // Left of the notch: rpm, and the driver's inputs under it: accelerator (green) and brake
+        // pressure (red, full bar at 100 bar).
+        icon(GRID_X0 + 14, 210 + D_Y, 32, TeleIcons.TACH, ICONC, true);
+        text(NOTCH_X0 - 8, 204 + D_Y, 40, false, RIGHT, over ? RED : vc, ok(CH_RPM) ? Integer.toString(rpm) : "-", link);
+        text(NOTCH_X0 - 8, 208 + D_Y, 34, true, RIGHT, AMBER, "NO LINK", !link);
+        icon(GRID_X0 + 16, 254 + D_Y, 26, TeleIcons.PEDAL, ICONC, true);
+        bar(GRID_X0 + 54, 261 + D_Y, 70, 12, ped, 0, link ? PEDAL_FILL : GREY, -1);
+        text(NOTCH_X0 - 8, 255 + D_Y, 24, false, RIGHT, vc, ok(CH_PEDAL) ? percent(ped) : "-", true);
         icon(GRID_X0 + 16, 288 + D_Y, 26, TeleIcons.BRAKE, brk > 0 && link ? BRAKE_FILL : ICONC, true);
         bar(GRID_X0 + 54, 295 + D_Y, 70, 12, Math.min(brk, 100), 0, link ? BRAKE_FILL : GREY, -1);
         text(NOTCH_X0 - 8, 289 + D_Y, 24, false, RIGHT, vc, ok(CH_BRAKE) ? withUnit(brk, " bar") : "-", true);
+        }
 
         // Right of the notch: boost as a turbo-style arc. Segments sweep from vacuum (steel blue)
         // through zero into boost, warming amber -> orange -> red, with a glow while on boost; a white
@@ -615,6 +620,10 @@ public final class TeleLayout {
         int px = bx + pk * pitch - 2;
         quad(px - 7, by - 12, px + 7, by - 12, px, by - 3, px, by - 3, SAKURA, link && peakKpa > 0);
 
+        if (la) {
+            launchChecks(GRID_X0, GRID_X1, GRID_Y);
+            return;
+        }
         // Temperatures in one row, an icon and a value in each cell, short dividers between.
         int cw = (GRID_X1 - GRID_X0) / T_CH.length;
         // themed: the hairline over the row (was in the theme picture, which crossed the Haldex page's car)
@@ -625,6 +634,66 @@ public final class TeleLayout {
                 box(cx0, GRID_Y + 4, 1, 24, LINE, true);
             tempCell(t, cx0 + 12, cx0 + cw - 12, GRID_Y, 30, 32, rpm);
         }
+    }
+
+    // ---------------------------------------------------------------- launch screen (2026-11-25)
+    // User: when launch control is set up (brake at least half, throttle at least 30 %), a screen
+    // for it. Armed while stopped with brake >= 50 bar and throttle >= 30 %; stays on until the
+    // brake drops under 40 bar, the throttle under 20 % or the car rolls (hysteresis against
+    // flicker). The rev strip, gear and boost stay; the rpm cell and the temperature row become
+    // the launch block. Without a speed channel, speed does not count.
+    static final int LAUNCH_BRAKE = 50;
+    static final int LAUNCH_PEDAL = 30;
+    static final int LAUNCH_AMBER = 0xFFB020FF;
+    static final int LAUNCH_GO = 0x3CE08AFF;
+    private boolean launchOn;
+
+    private boolean launchArmed(int ped, int brk) {
+        int spd = ok(CH_SPEED) ? r(val[CH_SPEED]) : 0;
+        if (!link || !ok(CH_PEDAL) || !ok(CH_BRAKE)) {
+            launchOn = false;
+        } else if (launchOn) {
+            launchOn = brk >= LAUNCH_BRAKE - 10 && ped >= LAUNCH_PEDAL - 10 && spd <= 5;
+        } else {
+            launchOn = brk >= LAUNCH_BRAKE && ped >= LAUNCH_PEDAL && spd < 3;
+        }
+        return launchOn;
+    }
+
+    /** Ready when the Haldex is (nearly) locked. */
+    private boolean launchReady() {
+        return ok(CH_HX_ACTUAL) && r(val[CH_HX_ACTUAL]) >= 90;
+    }
+
+    /** Classic: the rpm cell becomes LAUNCH, the rpm big, gas and brake as numbers. */
+    private void launchLeft(int rpm, int ped, int brk) {
+        boolean ready = launchReady();
+        int c = ready ? LAUNCH_GO : LAUNCH_AMBER;
+        box(GRID_X0 + 4, LINE_Y + 8, NOTCH_X0 - GRID_X0 - 10, 4, c, true);
+        text(GRID_X0 + 14, LINE_Y + 18, 22, true, LEFT, c, "LAUNCH", true);
+        text(NOTCH_X0 - 8, LINE_Y + 21, 16, true, RIGHT, c, ready ? "READY" : "ARMED", true);
+        text(NOTCH_X0 - 8, LINE_Y + 44, 48, false, RIGHT, WHITE, Integer.toString(rpm), true);
+        text(GRID_X0 + 14, LINE_Y + 66, 14, true, LEFT, GREY, "RPM", true);
+        text(GRID_X0 + 14, LINE_Y + 104, 13, true, LEFT, GREY, "GAS", true);
+        text(GRID_X0 + 56, LINE_Y + 98, 22, false, LEFT, WHITE, percent(ped), true);
+        text(NOTCH_X0 - 66, LINE_Y + 104, 13, true, RIGHT, GREY, "BRAKE", true);
+        text(NOTCH_X0 - 8, LINE_Y + 98, 22, false, RIGHT, WHITE, Integer.toString(brk), true);
+    }
+
+    /** The row under the notch while armed: lock, preset, and the state as a word. */
+    private void launchChecks(int x0, int x1, int y) {
+        int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
+        boolean ready = launchReady();
+        String pn = presetName();
+        boolean lp = pn != null && pn.toUpperCase().indexOf("LAUNCH") >= 0;
+        int w = (x1 - x0) / 3;
+        box(x0 + 8, y - 10, x1 - x0 - 16, 1, 0x3E8BFF8C, themed);
+        icon(x0 + 12, y, 30, TeleIcons.AWD, ready ? LAUNCH_GO : LAUNCH_AMBER, true);
+        text(x0 + w - 12, y, 32, false, RIGHT, ready ? LAUNCH_GO : LAUNCH_AMBER, percent(act), true);
+        box(x0 + w, y + 4, 1, 24, LINE, true);
+        text(x0 + w + w / 2, y + 2, 26, true, CENTER, lp ? LAUNCH_GO : LAUNCH_AMBER, pn != null ? pn.toUpperCase() : "-", true);
+        box(x0 + 2 * w, y + 4, 1, 24, LINE, true);
+        text(x0 + 2 * w + w / 2, y + 2, 28, true, CENTER, ready ? LAUNCH_GO : LAUNCH_AMBER, ready ? "GO" : "LOCK LOW", true);
     }
 
     /** Boost scheme: ice at zero, sakura at 0.9 bar, red at full boost. */
@@ -859,6 +928,17 @@ public final class TeleLayout {
         // Haldex lock: icon, strip with the target tick, percent.
         int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
         int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
+        int pedS = ok(CH_PEDAL) ? clamp(r(val[CH_PEDAL]), 0, 100) : 0;
+        double rawBrakeS = ok(CH_BRAKE) ? Math.max(0, val[CH_BRAKE] / 1000.0) : 0;
+        brakeSm += 0.3 * (rawBrakeS - brakeSm);
+        int brkS = brakeSm < 2.0 ? 0 : clamp((int) Math.round(brakeSm), 0, 999);
+        boolean laS = launchArmed(pedS, brkS);
+        if (laS) {
+            int lc = launchReady() ? LAUNCH_GO : LAUNCH_AMBER;
+            box(142, 124, 274, 4, lc, true);
+            text(142, 134, 26, true, LEFT, lc, "LAUNCH", true);
+            text(416, 140, 18, true, RIGHT, lc, launchReady() ? "READY" : "ARMED", true);
+        } else {
         // 2026-11-25 (user: too crowded): a shorter row centred in the space between the panel's
         // top line and the gear, and between the frame and the arc (16 px margins: 52..473)
         int hbw = 150;
@@ -868,6 +948,7 @@ public final class TeleLayout {
         box(hx + 44 + hbw * tgt / 100 - 1, 136, 2, 24, WHITE, ok(CH_HX_TARGET));
         text(hx + 44 + hbw + 14 + 80, 128, 36, false, RIGHT, vc, ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
 
+        }
         // Gear, red past the shift point, flashing at the limiter; temperatures beside it.
         // with the bloom (red behind it) the gear stays white past the shift point and flashes
         // dark navy at the limiter; red on red did not read
@@ -877,6 +958,16 @@ public final class TeleLayout {
         gearGlyph(152, 192, 156, gc);
         text(152, 352, 22, true, CENTER, AMBER, "NO LINK", !link);
         box(244, 192, 2, 168, LINE, true); // ends above AUTOCROSS
+        if (laS) {
+            // launch: rpm, gas, brake and lock in the column instead of the temperatures
+            int actL = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
+            String[] lab = {"RPM", "GAS", "BRAKE", "LOCK"};
+            String[] lv = {Integer.toString(rpm), percent(pedS), Integer.toString(brkS), percent(actL)};
+            for (int k = 0; k < 4; k++) {
+                text(276, 190 + k * 56 + 10, 13, true, LEFT, GREY, lab[k], true);
+                text(x1, 190 + k * 56, 32, false, RIGHT, k == 3 ? (launchReady() ? LAUNCH_GO : LAUNCH_AMBER) : WHITE, lv[k], true);
+            }
+        } else {
         int row = 0;
         for (int t = 0; t < T_CH.length; t++) {
             if (T_CH[t] == CH_OIL)
@@ -884,10 +975,14 @@ public final class TeleLayout {
             tempCell(t, 276, x1, 190 + row * 56, 30, 32, rpm); // 32 px, rows 56 apart
             row++;
         }
+        }
 
         // Preset and mode under the gear; Wi-Fi warning beside them while the link is slow or lost.
         // 2026-11-25 (user): smaller, centred under the gear
-        text(152, 366, 22, false, CENTER, link ? PRESET : GREY, presetName(), true);
+        // while launch is armed: amber unless the Launch preset is on
+        String pnS = presetName();
+        boolean wrongPreset = laS && (pnS == null || pnS.toUpperCase().indexOf("LAUNCH") < 0);
+        text(152, 366, 22, false, CENTER, !link ? GREY : wrongPreset ? LAUNCH_AMBER : PRESET, pnS, true);
         text(152, 392, 13, true, CENTER, GREY, presetMode(), true);
         boolean slow = link && rateHz >= 0 && rateHz < 10;
         icon(222, 368, 20, TeleIcons.WIFI, AMBER, !link || slow);
