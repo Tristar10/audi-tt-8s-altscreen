@@ -522,7 +522,7 @@ tele)
                off) rm -f /tmp/tt-tele-glide; if test -f $K/tele-glide; then rw; rm -f $K/tele-glide; ro; fi; say 'Glide off.';;
                boot) rw; touch $K/tele-glide; ro; say 'Glide on at every start.';;
                *) say 'Usage: sh tt.sh tele glide on | off | boot'; exit 2;; esac;;
-        car|pictures) for f in hx-car-up hx-car-side strip-track strip-lit strip-red notch-glow sp-chibi-white sp-chibi-doll; do
+        car|pictures) for f in hx-car-up hx-car-side strip-track strip-lit strip-red notch-glow sp-chibi-white sp-chibi-doll sp-bloom sp-emblem; do
                if test -f /tmp/$f.rgba; then rw; cp /tmp/$f.rgba $K/$f.rgba; ro; say "Installed $f.rgba."; fi
              done; say 'Car, strip and glow pictures installed: restart the MMI to load them.';;
         theme) case "${3:-}" in

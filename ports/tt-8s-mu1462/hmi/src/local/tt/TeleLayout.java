@@ -70,6 +70,16 @@ public final class TeleLayout {
     public static final int SP_DOLL_Y = 381;
     public static final int SP_DOLL_W = 73;
     public static final int SP_DOLL_H = 86;
+    /** Sport's rpm bloom (a soft red disc, scaled each frame) and the emblem it reveals (2026-11-25). */
+    public static final int SP_BLOOM = 5;
+    public static final int SP_BLOOM_S = 256;
+    public static final int SP_EMBLEM = 6;
+    public static final int SP_EMBLEM_S = 340;
+    static final int BLOOM_CX = 236;
+    static final int BLOOM_CY = 282;
+    static final int BLOOM_RX = 250;
+    static final int BLOOM_RY = 205;
+    static final int BLOOM_FROM = 4500;
     /** Picture sizes on the screen (the files on the car are exactly these). */
     public static final int CAR_UP_W = 128;
     public static final int CAR_UP_H = 264;
@@ -81,6 +91,8 @@ public final class TeleLayout {
     public boolean glowArt;
     /** The Sport chibi pictures are on the head unit (TeleView sets it). */
     public boolean chibiArt;
+    /** The Sport bloom and emblem pictures are on the head unit (TeleView sets it). */
+    public boolean bloomArt;
     public static final int LEFT = 0;
     public static final int CENTER = 1;
     public static final int RIGHT = 2;
@@ -773,6 +785,21 @@ public final class TeleLayout {
         box(28, 106, 420, 349, 0xFF3B3030, warn); // the bezel and the dial cover what lies outside SP_X/SP_Y
         quad(448, 106, 541, 106, 458, 235, 448, 290, 0xFF3B3030, warn); // up to the dial's ring
         quad(448, 290, 451, 349, 490, 455, 448, 455, 0xFF3B3030, warn);
+
+        // 2026-11-25 (user, after the Viper's tach): the shift lights became a red bloom growing
+        // from the panel's middle with rpm (4500 to the shift point), an emblem in dark lines that
+        // shows only where the bloom is, and a slim arc of segments along the rev counter's ring
+        // for the exact count. From the shift point all of it flashes with the frame.
+        if (themed && bloomArt) {
+            double t = link ? Math.max(0, Math.min(1, (rpm - BLOOM_FROM) / (double) (shiftRpm - BLOOM_FROM))) : 0;
+            double k = over ? (blink ? 1.0 : 0.9) : 0.12 + 0.88 * t;
+            int bw = Math.max(8, (int) Math.round(2 * BLOOM_RX * k));
+            int bh = Math.max(8, (int) Math.round(2 * BLOOM_RY * k));
+            int bi = add(IMAGE, BLOOM_CX - bw / 2, BLOOM_CY - bh / 2, bw, bh, WHITE, t > 0);
+            size[bi] = SP_BLOOM;
+            int ei = add(IMAGE, BLOOM_CX - SP_EMBLEM_S / 2, BLOOM_CY - SP_EMBLEM_S / 2, SP_EMBLEM_S, SP_EMBLEM_S, WHITE, true);
+            size[ei] = SP_EMBLEM;
+        }
         // the theme's two chibis (pictures, so the Haldex page can leave them out)
         if (themed && chibiArt && page != PAGE_HALDEX) {
             int ci = add(IMAGE, SP_WHITE_X, SP_WHITE_Y, SP_WHITE_W, SP_WHITE_H, WHITE, true);
@@ -780,24 +807,17 @@ public final class TeleLayout {
             ci = add(IMAGE, SP_DOLL_X, SP_DOLL_Y, SP_DOLL_W, SP_DOLL_H, WHITE, true);
             size[ci] = SP_DOLL;
         }
-
-        // Shift lights along the panel's top (user 2026-11-24, in place of the hazard band): ten
-        // glass segments lighting left to right over the last 1200 rpm, mint, cobalt, red, then all
-        // flashing red from the shift point with the frame.
-        int nl = 10;
-        int lw = 18;
-        int lgap = 4;
-        int lx = 150; // the Sport guide: left of the white chibi in the top-right corner
-        int lyt = 110; // the Sport guide: under the status strip notch (y 96..98)
-        int lh = 26; // tele16: thicker
-        for (int i = 0; i < nl; i++) {
-            int on = shiftRpm - (nl - i) * 120;
+        int na = 10;
+        double aTop = 160;
+        double aBot = 193;
+        for (int i = 0; i < na; i++) {
+            int on = shiftRpm - (na - i) * 120;
             boolean lit = link && (over ? blink : rpm >= on);
-            int c = !lit ? GLASS_OFF : over ? RED : i < 3 ? MINT : i < 6 ? COBALT_LT : RED;
-            int sx = lx + i * (lw + lgap);
-            quad(sx + 5, lyt - 1, sx + lw + 6, lyt - 1, sx + lw + 1, lyt + lh + 1, sx - 1, lyt + lh + 1, GLASS_EDGE, true);
-            quad(sx + 6, lyt, sx + lw + 5, lyt, sx + lw, lyt + lh, sx, lyt + lh, c, true);
-            quad(sx + 7, lyt + 3, sx + lw + 3, lyt + 3, sx + lw + 1, lyt + 10, sx + 5, lyt + 10, 0xFFFFFF5C, lit);
+            int c = !lit ? GLASS_OFF : over ? RED : i < 4 ? SAKURA : i < 7 ? 0xFF6A4AFF : RED;
+            double a0 = aBot - (aBot - aTop) * i / na - 0.6;
+            double a1 = aBot - (aBot - aTop) * (i + 1) / na + 0.6;
+            ring(720, 309, 277, 293, a0, a1, GLASS_EDGE, true);
+            ring(720, 309, 278, 292, a0 - 0.15, a1 + 0.15, c, true);
         }
 
         if (page == PAGE_HALDEX) {
@@ -820,7 +840,10 @@ public final class TeleLayout {
         text(x1 - 34, 142, 36, false, RIGHT, vc, ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
 
         // Gear, red past the shift point, flashing at the limiter; temperatures beside it.
-        int gc = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
+        // with the bloom (red behind it) the gear stays white past the shift point and flashes
+        // dark navy at the limiter; red on red did not read
+        boolean bloomOn = themed && bloomArt;
+        int gc = !link ? GREY : limit ? (blink ? (bloomOn ? 0x0A1030FF : RED) : WHITE) : over && !bloomOn ? RED : WHITE;
         gearGlyph(132, 190, 170, gc);
         text(132, 350, 22, true, CENTER, AMBER, "NO LINK", !link);
         box(222, 192, 2, 196, LINE, true);
