@@ -165,7 +165,22 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele24)
+## Autocross view on the head unit (tt-zoom tele25)
+
+tele25 (2026-11-25, jar sha256 6f0ed20b…7784), all renders approved in the simulator first:
+- Visible areas from the user's clipping guides (sim `ref/`); in Sport only the left panel is ours.
+- Classic: fender arches back, portraits clear of the Haldex readout, chibis beside the dials,
+  thicker frames, the notch glow picture (`notch-glow.rgba`).
+- Haldex page: app-style see-through tyres flush with the body (TYRE icon, steering), clutch
+  plates, the torque split at the tail and nose (rear = lock / 2), a LOCK row; Sport: a lock bar,
+  the split beside the axles, the boost row.
+- Sport: shift lights replaced by a red bloom from 4500 rpm (`sp-bloom.rgba`, bright layer
+  `sp-bloom-hot.rgba` from 5300) with the user's line art (`sp-emblem.rgba`, shown from 5300) and a
+  slim arc along the tach; a portrait top left (theme picture); no chibis; calmer spacing.
+- Shadows on texts, icons and bars, switchable (`tele shadows`).
+- Kit: the jar, tt.sh and 12 pictures; `sh tt.sh tele theme install` and `sh tt.sh tele pictures`.
+
+### tele24
 
 From the car photos and the tele23 render (user 2026-11-24):
 - The rev strip's ends touched the cluster housing: now x 64 and 1376 (were 24 and 1416). The
