@@ -305,8 +305,10 @@ public final class TeleLayout {
             liveLarge();
         else
             liveSmall();
-        if (page != PAGE_PRESETS)
-            launchOverlay(large); // floats over the page; the page itself is unchanged
+        // floats over the page; the page itself is unchanged. Not while the pop-up is open: it
+        // covers the middle anyway, and Classic + banner + pop-up reached the 400-slot limit
+        if (page != PAGE_PRESETS && !uiOpen)
+            launchOverlay(large);
         if (testData)
             testTag(large); // floats over the page and the launch banner
         if (uiOpen && page != PAGE_PRESETS)
