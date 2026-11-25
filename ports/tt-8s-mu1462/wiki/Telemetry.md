@@ -294,6 +294,12 @@ shows the Java heap after loading (`grep "tele theme" /tmp/tt-rgd.log`).
 **Glide** (TeleGlide, shared with the simulator): `sh tt.sh tele glide on|off|boot`; the moving
 channels go along the line between the last two samples, one sample (about 50 ms) late.
 
+**Shadows** (on by default, 2026-11-25): every text has a dark copy 1-3 px down-right, icons and
+gear digits carry a soft shadow in their own picture, bars a recessed track and a raised fill.
+Text shadows double the text slots (Classic 310 / Sport 108 of 400) and the text updates per
+frame. To compare the frame rate: `sh tt.sh tele shadows off`, `sh tt.sh tele stats`, then
+`sh tt.sh tele shadows on` (`boot-off` keeps them off at every start).
+
 **Selftest**: `sh tt.sh tele selftest` walks through the parked test (view and build time,
 switching, redline flash, sound list and tones, key trace, strip probe, shift tone), waits for
 Enter between steps and writes everything to /tmp/tt-selftest-HHMMSS.txt.

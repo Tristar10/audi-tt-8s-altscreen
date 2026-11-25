@@ -48,6 +48,7 @@ import de.esolutions.hmi.widgets.audi.base.eal.TextureDescription;
  *   /tmp/tt-shot         tele18: a screenshot of the cockpit, written by the head unit itself as a
  *                        PNG to the path in the file (HMIService.takeScreenshot, the stock key-combo
  *                        screenshot's call), then the file is deleted
+ *   /tmp/tt-tele-shadows-off  2026-11-25: no text, bar and icon shadows (or /mnt/app/root/tt/tele-shadows-off)
  *   /tmp/tt-tele-glide   tele17: glide between data updates (or /mnt/app/root/tt/tele-glide); TeleGlide
  *   /tmp/tt-tele-probe   tele8 probe instead of the view: the painted rev strip (TeleStrip), the
  *                        lit picture cut by a clip rectangle at the rpm. "grp" (default): the clip
@@ -93,6 +94,10 @@ public final class TeleView implements Runnable {
         new File(DIR, "strip-red.rgba")};
     private static final byte[][] STRIP_PX = new byte[3][];
     private static boolean stripTried;
+    private static final File SHADOWS_OFF_RAM = new File("/tmp/tt-tele-shadows-off");
+    private static final File SHADOWS_OFF_FLASH = new File(DIR, "tele-shadows-off");
+    /** Shadows on unless an off file exists (default on). */
+    private static volatile boolean shadows = true;
     private static final File GLIDE_RAM = new File("/tmp/tt-tele-glide");
     private static final File GLIDE_FLASH = new File(DIR, "tele-glide");
     private static volatile boolean glide;
@@ -259,6 +264,8 @@ public final class TeleView implements Runnable {
                         layout.carArt = carLoaded();
                         layout.glowArt = CAR[TeleLayout.NOTCH_GLOW] != null;
                         layout.chibiArt = CAR[TeleLayout.SP_WHITE] != null && CAR[TeleLayout.SP_DOLL] != null;
+                        layout.shadows = shadows;
+                        TeleIcons.shadows = shadows;
                         layout.bloomArt = CAR[TeleLayout.SP_BLOOM] != null && CAR[TeleLayout.SP_EMBLEM] != null
                             && CAR[TeleLayout.SP_BLOOM_HOT] != null;
                         layout.paintedStrip = stripLoaded();
@@ -577,7 +584,9 @@ public final class TeleView implements Runnable {
             return new Long(0x100000000L | (c & 0xFFFFFFFFL));
         }
         if (f.kind[i] == TeleLayout.ICON) {
-            return new Long(((long) (2 + f.size[i] * 1000000 + f.w[i] * 1000 + f.h[i]) << 32) | (c & 0xFFFFFFFFL));
+            // with or without the baked shadow are different pictures
+            return new Long(((long) (2 + f.size[i] * 1000000 + f.w[i] * 1000 + f.h[i]) << 32) | (c & 0xFFFFFFFFL)
+                | (shadows ? 0L : 1L << 62));
         }
         if (f.kind[i] == TeleLayout.QUAD) {
             return new Long(((long) (shapeKey(f, i) | 0x40000000) << 32) | (c & 0xFFFFFFFFL));
@@ -1209,6 +1218,7 @@ public final class TeleView implements Runnable {
         shiftBeep = readLine(SHIFTBEEP_FILE);
         themeOn = THEME_RAM.exists() || THEME_FLASH.exists();
         glide = GLIDE_RAM.exists() || GLIDE_FLASH.exists();
+        shadows = !(SHADOWS_OFF_RAM.exists() || SHADOWS_OFF_FLASH.exists());
         if (!themeOn) {
             THEME[0] = null;
             THEME[1] = null;

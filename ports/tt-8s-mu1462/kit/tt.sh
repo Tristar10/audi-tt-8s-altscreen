@@ -517,6 +517,11 @@ tele)
                       *) shift 3; : > /tmp/tt-tele-keymap; for l in "$@"; do echo "$l" >> /tmp/tt-tele-keymap; done; say "Key map (RAM):"; cat /tmp/tt-tele-keymap;; esac;;
                savemap) if test -f /tmp/tt-tele-keymap; then rw; cp /tmp/tt-tele-keymap $K/tele-keymap; ro; say 'Key map saved to flash.'; else say 'No key map in RAM: sh tt.sh tele ui map ... first.'; exit 1; fi;;
                *) say 'Usage: sh tt.sh tele ui open | up | down | press | back | close | map "CODE EVENT ACTION"... | savemap'; exit 2;; esac;;
+        shadows) case "${3:-}" in
+               on) rm -f /tmp/tt-tele-shadows-off; if test -f $K/tele-shadows-off; then rw; rm -f $K/tele-shadows-off; ro; fi; say 'Shadows on (texts, icons, bars; within 1 s).';;
+               off) touch /tmp/tt-tele-shadows-off; say 'Shadows off until the next start (compare with: sh tt.sh tele stats).';;
+               boot-off) rw; touch $K/tele-shadows-off; ro; say 'Shadows off at every start.';;
+               *) say 'Usage: sh tt.sh tele shadows on | off | boot-off   (on is the default)'; exit 2;; esac;;
         glide) case "${3:-}" in
                on) touch /tmp/tt-tele-glide; say 'Glide on: gauges move smoothly between data updates (about 50 ms behind).';;
                off) rm -f /tmp/tt-tele-glide; if test -f $K/tele-glide; then rw; rm -f $K/tele-glide; ro; fi; say 'Glide off.';;
