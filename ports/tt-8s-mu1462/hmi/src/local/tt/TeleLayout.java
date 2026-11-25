@@ -55,6 +55,10 @@ public final class TeleLayout {
     public static final int IMAGE = 5;
     public static final int CAR_UP = 0;
     public static final int CAR_SIDE = 1;
+    /** Classic's themed notch glow (2026-11-25, after the FL5): live page only, under the line and gear. */
+    public static final int NOTCH_GLOW = 2;
+    public static final int NOTCH_GLOW_W = 248;
+    public static final int NOTCH_GLOW_H = 124;
     /** Picture sizes on the screen (the files on the car are exactly these). */
     public static final int CAR_UP_W = 128;
     public static final int CAR_UP_H = 264;
@@ -62,6 +66,8 @@ public final class TeleLayout {
     public static final int CAR_SIDE_H = 186;
     /** The car pictures are on the head unit (TeleView sets it): the page draws the livery. */
     public boolean carArt;
+    /** The notch glow picture is on the head unit (TeleView sets it). */
+    public boolean glowArt;
     public static final int LEFT = 0;
     public static final int CENTER = 1;
     public static final int RIGHT = 2;
@@ -433,17 +439,30 @@ public final class TeleLayout {
         // Red line across with a soft glow, and the notch holding the gear: two layers for depth,
         // flashing with the shift lights from the shift point.
         if (!hxPage) {
+        // themed: no fill (the theme's red glow shows behind the gear) except the shift flash
         quad(NOTCH_X0, LINE_Y, NOTCH_X1, LINE_Y, NOTCH_X1 - NOTCH_SLOPE, NOTCH_Y, NOTCH_X0 + NOTCH_SLOPE, NOTCH_Y,
-            themed ? (hot ? 0x40100CA0 : 0x11060650) : hot ? NOTCH_HOT : NOTCH, true);
-        box(GRID_X0, LINE_Y, NOTCH_X0 - GRID_X0 + 1, 2, RED, true);
-        box(NOTCH_X1 - 1, LINE_Y, GRID_X1 - NOTCH_X1 + 1, 2, RED, true);
-        quad(NOTCH_X0 - 1, LINE_Y, NOTCH_X0 + 1, LINE_Y, NOTCH_X0 + NOTCH_SLOPE + 1, NOTCH_Y,
-            NOTCH_X0 + NOTCH_SLOPE - 1, NOTCH_Y, RED, true);
-        quad(NOTCH_X1 - 1, LINE_Y, NOTCH_X1 + 1, LINE_Y, NOTCH_X1 - NOTCH_SLOPE + 1, NOTCH_Y,
-            NOTCH_X1 - NOTCH_SLOPE - 1, NOTCH_Y, RED, true);
-        box(NOTCH_X0 + NOTCH_SLOPE - 1, NOTCH_Y - 1, NOTCH_X1 - NOTCH_X0 - 2 * NOTCH_SLOPE + 2, 2, RED, true);
+            themed ? 0xFF4A3070 : hot ? NOTCH_HOT : NOTCH, !themed || hot);
+        if (themed && glowArt) {
+            int gi = add(IMAGE, NOTCH_X0, LINE_Y, NOTCH_GLOW_W, NOTCH_GLOW_H, WHITE, true);
+            size[gi] = NOTCH_GLOW;
         }
-        int gc = !link ? GREY : over && !blink ? RED : WHITE;
+        // 2026-11-25 (user: the notch was too flimsy): a 4 px line with a soft red glow on both
+        // sides, the glow first (one wide translucent layer, then the line over it).
+        for (int k = 0; k < 2; k++) {
+            int w = k == 0 ? 7 : 2;
+            int c = k == 0 ? 0xFF2A2A40 : RED; // RGBA
+            box(GRID_X0, LINE_Y - w + 1, NOTCH_X0 - GRID_X0 + w, 2 * w, c, true);
+            box(NOTCH_X1 - w, LINE_Y - w + 1, GRID_X1 - NOTCH_X1 + w, 2 * w, c, true);
+            quad(NOTCH_X0 - w, LINE_Y - w + 1, NOTCH_X0 + w, LINE_Y - w + 1, NOTCH_X0 + NOTCH_SLOPE + w, NOTCH_Y + w,
+                NOTCH_X0 + NOTCH_SLOPE - w, NOTCH_Y + w, c, true);
+            quad(NOTCH_X1 - w, LINE_Y - w + 1, NOTCH_X1 + w, LINE_Y - w + 1, NOTCH_X1 - NOTCH_SLOPE + w, NOTCH_Y + w,
+                NOTCH_X1 - NOTCH_SLOPE - w, NOTCH_Y + w, c, true);
+            box(NOTCH_X0 + NOTCH_SLOPE + w, NOTCH_Y - w + 1, NOTCH_X1 - NOTCH_X0 - 2 * NOTCH_SLOPE - 2 * w, 2 * w, c, true);
+        }
+        }
+        // themed: past the shift point the gear flashes dark navy over the red glow (red on red
+        // did not read)
+        int gc = !link ? GREY : over && !blink ? (themed ? 0x0A1030FF : RED) : WHITE;
         if (!hxPage)
             gearGlyph(720, 208 + D_Y, 104, gc);
 
@@ -463,8 +482,10 @@ public final class TeleLayout {
         // them a bar along the slope with the target as a white tick.
         int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
         int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
-        double ba = r0 + 90;
-        double bb = len - 10;
+        // 2026-11-25: the first 200 px of the slope only (the chibi left this corner), so the
+        // portrait's face is clear of the readout and its dark plate
+        double ba = r0 + 16;
+        double bb = r0 + 200;
         // Fixed pieces (no shape changes per frame on the car): each piece is lit or not, and the
         // target tick is a white mark over the piece holding the target.
         int hs = 20;

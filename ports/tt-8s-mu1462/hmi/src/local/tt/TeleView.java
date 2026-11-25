@@ -77,10 +77,12 @@ public final class TeleView implements Runnable {
     private static final boolean[] THEME_BAD = new boolean[2];
     private static volatile boolean themeOn;
     /** tele20: the Haldex page's car pictures (simulator export), read once. */
-    private static final File[] CAR_FILES = {new File(DIR, "hx-car-up.rgba"), new File(DIR, "hx-car-side.rgba")};
+    // (2026-11-25: the third is the themed notch glow, same loader)
+    private static final File[] CAR_FILES = {new File(DIR, "hx-car-up.rgba"), new File(DIR, "hx-car-side.rgba"),
+        new File(DIR, "notch-glow.rgba")};
     private static final int[][] CAR_SIZE = {{TeleLayout.CAR_UP_W, TeleLayout.CAR_UP_H},
-        {TeleLayout.CAR_SIDE_W, TeleLayout.CAR_SIDE_H}};
-    private static final byte[][] CAR = new byte[2][];
+        {TeleLayout.CAR_SIDE_W, TeleLayout.CAR_SIDE_H}, {TeleLayout.NOTCH_GLOW_W, TeleLayout.NOTCH_GLOW_H}};
+    private static final byte[][] CAR = new byte[3][];
     private static boolean carTried;
     /** tele21: the painted strip's pictures (track, lit, lit red), simulator export, read once. */
     private static final File[] STRIP_FILES = {new File(DIR, "strip-track.rgba"), new File(DIR, "strip-lit.rgba"),
@@ -251,6 +253,7 @@ public final class TeleView implements Runnable {
                         int theme = themeOn && themeLoaded(view) ? view : -1;
                         layout.themed = theme >= 0;
                         layout.carArt = carLoaded();
+                        layout.glowArt = CAR[TeleLayout.NOTCH_GLOW] != null;
                         layout.paintedStrip = stripLoaded();
                         layout.overflow = false;
                         layout.build(view, UI.page());
@@ -386,19 +389,22 @@ public final class TeleView implements Runnable {
         }
     }
 
-    /** Reads both car pictures once (premultiplied for EAL); true when both are there. */
+    /**
+     * Reads the car pictures and the notch glow once (premultiplied for EAL); true when both car
+     * pictures are there (the glow: CAR[NOTCH_GLOW] != null). A missing one only skips that one.
+     */
     private static boolean carLoaded() {
         if (carTried) {
             return CAR[0] != null && CAR[1] != null;
         }
         carTried = true;
-        for (int k = 0; k < 2; k++) {
+        for (int k = 0; k < CAR_FILES.length; k++) {
             File f = CAR_FILES[k];
             long want = (long) CAR_SIZE[k][0] * CAR_SIZE[k][1] * 4;
             if (!f.exists() || f.length() != want) {
                 RgdBus.note(new StringBuffer("tele car: ").append(f.getPath()).append(f.exists() ? " has the wrong size" : " missing")
-                    .append(" (drawn as outlines)").toString());
-                return false;
+                    .append(k == TeleLayout.NOTCH_GLOW ? " (no glow)" : " (drawn as outlines)").toString());
+                continue;
             }
             try {
                 byte[] b = new byte[(int) want];
@@ -424,11 +430,10 @@ public final class TeleView implements Runnable {
                 CAR[k] = b;
             } catch (Throwable t) {
                 RgdBus.note(new StringBuffer("tele car: read failed ").append(String.valueOf(t)).toString());
-                return false;
             }
         }
-        RgdBus.note("tele car: pictures loaded");
-        return true;
+        RgdBus.note("tele car: pictures read");
+        return CAR[0] != null && CAR[1] != null;
     }
 
     /** Reads a view's theme picture from flash once (tick thread); false if missing or wrong size. */
