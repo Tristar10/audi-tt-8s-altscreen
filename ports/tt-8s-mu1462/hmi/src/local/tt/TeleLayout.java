@@ -509,10 +509,12 @@ public final class TeleLayout {
 
         if (hxPage) {
             // car sideways, nose to the right; gauge and stats to its right; the gear small in the corner
-            // 2026-11-25: no lock ring (the corner readout shows the lock); larger stats
-            drivetrain(378, 228, 440, 196, true);
-            hxStats(860, 236, 1000, 32, 60);
-            gearGlyph(1044, 392, 32, gc); // tele24: inside the panel (crossed its right edge)
+            // 2026-11-25 (user): the car toward the middle with the torque share at its tail
+            // (rear) and nose (front); stats with the actual lock on the right; the gear bottom left
+            drivetrain(452, 228, 384, 196, true);
+            torqueSplit();
+            hxStats(924, 232, 1058, 26, 46, true);
+            gearGlyph(408, 388, 34, gc); // bottom left, under the rear share
             return;
         }
         // Left of the notch: rpm, and the driver's inputs under it: accelerator (green) and brake
@@ -782,7 +784,7 @@ public final class TeleLayout {
             // car upright in the left column; gauge and stats on the right
             drivetrain(70, 142, 160, 280, false);
             lockRing(320, 220, 56, 14);
-            hxStats(236, 296, 424, 24, 50);
+            hxStats(236, 296, 424, 24, 50, false);
             int gcS = !link ? GREY : limit ? (blink ? RED : WHITE) : over ? RED : WHITE;
             gearGlyph(398, 308, 44, gcS); // beside the stats, clear of the bottom row
         } else {
@@ -1057,31 +1059,67 @@ public final class TeleLayout {
             cx + rd(Math.cos(r0) * rIn), cy - rd(Math.sin(r0) * rIn), c, v);
     }
 
-    /** TARGET, STEERING, CLUTCH: label over value (vs px), rows rg apart, from x0 to x1 at y0. */
-    private void hxStats(int x0, int y0, int x1, int vs, int rg) {
+    /**
+     * [LOCK,] TARGET, STEERING, CLUTCH: label over value (vs px), rows rg apart, from x0 to x1 at
+     * y0. LOCK is the actual lock (Classic, user 2026-11-25); Sport shows it in its ring.
+     */
+    private void hxStats(int x0, int y0, int x1, int vs, int rg, boolean lockRow) {
+        int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
         int tgt = ok(CH_HX_TARGET) ? clamp(r(val[CH_HX_TARGET]), 0, 100) : 0;
         int vc = link ? WHITE : GREY;
-        int ls = vs >= 30 ? 13 : 12;
+        int ls = vs >= 26 ? 13 : 12;
         int vy = ls + 4;
-        text(x0, y0, ls, true, LEFT, GREY, "TARGET", true);
-        box(x0, y0 + vy + vs / 2 - 3, 7, 7, HX_PINK, link);
-        text(x0 + 14, y0 + vy, vs, true, LEFT, vc, ok(CH_HX_TARGET) ? percent(tgt) : "-", true);
-        text(x0, y0 + rg, ls, true, LEFT, GREY, "STEERING", true);
+        int y = y0;
+        if (lockRow) {
+            text(x0, y, ls, true, LEFT, GREY, "LOCK", true);
+            box(x0, y + vy + vs / 2 - 3, 7, 7, HX_CYAN, link);
+            text(x0 + 14, y + vy, vs, true, LEFT, link && act > 0 ? HX_CYAN : vc,
+                ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
+            y += rg;
+        }
+        text(x0, y, ls, true, LEFT, GREY, "TARGET", true);
+        box(x0, y + vy + vs / 2 - 3, 7, 7, HX_PINK, link);
+        text(x0 + 14, y + vy, vs, true, LEFT, vc, ok(CH_HX_TARGET) ? percent(tgt) : "-", true);
+        y += rg;
+        text(x0, y, ls, true, LEFT, GREY, "STEERING", true);
         String st = "-";
         if (ok(CH_STEER)) {
             int d = r(val[CH_STEER]);
             st = new StringBuffer(d > 0 ? "+" : "").append(d).append('°').toString();
         }
-        text(x0, y0 + rg + vy, vs, true, LEFT, vc, st, true);
+        text(x0, y + vy, vs, true, LEFT, vc, st, true);
+        y += rg;
         int ct = ok(CH_CLUTCH) ? r(val[CH_CLUTCH]) : -1;
         boolean hot = ct >= 90;
-        text(x0, y0 + 2 * rg, ls, true, LEFT, GREY, "CLUTCH", true);
-        text(x0, y0 + 2 * rg + vy, vs, true, LEFT, hot ? HX_PINK : vc, ct >= 0 ? temp(ct) : "-", true);
+        text(x0, y, ls, true, LEFT, GREY, "CLUTCH", true);
+        text(x0, y + vy, vs, true, LEFT, hot ? HX_PINK : vc, ct >= 0 ? temp(ct) : "-", true);
         int bw = x1 - x0 - 4;
-        int by = y0 + 2 * rg + vy + vs + 8;
+        int by = y + vy + vs + 6;
         box(x0, by, bw, 6, HX_IDLE, true);
         box(x0 + bw * 90 / 120, by - 2, 2, 10, 0xFF548F60, true);
         box(x0, by, ct > 0 ? Math.max(6, bw * Math.min(ct, 120) / 120) : 0, 6, hot ? HX_PINK : HX_CYAN, ct > 0);
+    }
+
+    /**
+     * Classic's torque share beside the sideways car: the rear share at its tail, the front share
+     * at its nose. Not sent by the board: taken from the lock as a Haldex splits it, the rear
+     * getting up to half (0 % lock = 100:0 front, 100 % = 50:50).
+     */
+    private void torqueSplit() {
+        int act = ok(CH_HX_ACTUAL) ? clamp(r(val[CH_HX_ACTUAL]), 0, 100) : 0;
+        boolean have = link && ok(CH_HX_ACTUAL);
+        int rear = (act + 1) / 2;
+        int front = 100 - rear;
+        int midY = carBox[1] + carBox[3] / 2;
+        int rx = carBox[0] - 38; // centre of the tail label
+        int fx = carBox[0] + carBox[2] + 40; // centre of the nose label
+        int rc = !have ? GREY : rear > 0 ? rearColour(act) : GREY;
+        text(rx, midY - 26, 30, true, CENTER, have ? (rear > 0 ? HX_CYAN : WHITE) : GREY,
+            have ? Integer.toString(rear) : "-", true);
+        text(rx + 1, midY + 8, 12, true, CENTER, GREY, "% REAR", true);
+        text(fx, midY - 26, 30, true, CENTER, have ? HX_ICE : GREY, have ? Integer.toString(front) : "-", true);
+        text(fx, midY + 8, 12, true, CENTER, GREY, "% FRONT", true);
+        box(rx - 16, midY + 26, 32, 3, rc, have && rear > 0);
     }
 
     /** A line from (ax,ay) to (bx,by), w px thick, as a quad (a little longer to close joints). */
