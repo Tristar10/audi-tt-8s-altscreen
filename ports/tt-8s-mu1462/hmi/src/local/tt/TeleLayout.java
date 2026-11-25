@@ -234,6 +234,8 @@ public final class TeleLayout {
     public boolean themed = false;
     /** Soft drop shadows under texts and a recessed look on bars (2026-11-25); icons carry their own. */
     public boolean shadows = true;
+    /** The board is sending its test pattern (TTG1 flags bit 0): TeleLink sets it. */
+    public boolean testData;
     /** The text shadow colour, RGBA. */
     static final int TEXT_SHADOW = 0x000000D8;
 
@@ -305,8 +307,27 @@ public final class TeleLayout {
             liveSmall();
         if (page != PAGE_PRESETS)
             launchOverlay(large); // floats over the page; the page itself is unchanged
+        if (testData)
+            testTag(large); // floats over the page and the launch banner
         if (uiOpen && page != PAGE_PRESETS)
             popup(large);
+    }
+
+    /**
+     * A floating TEST DATA tag while the board sends its test pattern (board session 2026-11-25:
+     * the pattern holds a fake launch and lock 100 %, which must never look real). Magenta, so it
+     * matches nothing else on screen; blinks at 1 Hz.
+     */
+    private void testTag(boolean large) {
+        boolean on = (now / 500) % 2 == 0;
+        int cx = large ? 720 : 280;
+        int y0 = large ? 432 : 108;
+        int w = large ? 196 : 150;
+        int h = large ? 26 : 22;
+        int c = 0xFF2EC8FF;
+        box(cx - w / 2 - 2, y0 - 2, w + 4, h + 4, on ? c : 0x7A1A66FF, true);
+        box(cx - w / 2, y0, w, h, 0x0A0410F0, true);
+        text(cx, y0 + 3, large ? 18 : 15, true, CENTER, on ? c : 0xFFFFFFFF, "TEST DATA", true);
     }
 
     private void liveLarge() {

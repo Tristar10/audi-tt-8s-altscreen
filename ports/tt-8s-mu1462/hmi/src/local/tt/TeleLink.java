@@ -50,6 +50,8 @@ final class TeleLink implements Runnable {
     private static int lastSeq = -1;
     private static long rx;
     private static long lost;
+    /** Flags byte of the last TTG1 (bit 0: test pattern). */
+    private static int lastFlags;
     private static long bad;
     private static int catN;
     private static int catVer = -1;
@@ -167,6 +169,7 @@ final class TeleLink implements Runnable {
                 return;
             }
             int seq = rd16(b, 8);
+            int flags = b[10] & 0xFF;
             int count = b[11] & 0xFF;
             if (12 + count * 6 > n) {
                 bump(false);
@@ -181,6 +184,7 @@ final class TeleLink implements Runnable {
                 }
                 lastSeq = seq;
                 lastRx = now;
+                lastFlags = flags;
                 rx++;
                 winRx++;
                 rateCount++;
@@ -365,6 +369,8 @@ final class TeleLink implements Runnable {
     static void snapshot(TeleLayout t, long now) {
         synchronized (LOCK) {
             t.link = lastRx != 0 && now - lastRx < LINK_MS;
+            // board flags bit 0: the board's test pattern (OpenHaldex v1.1.22), set on every packet of it
+            t.testData = t.link && (lastFlags & 1) != 0;
             for (int i = 0; i < CHANNELS; i++) {
                 t.val[i] = VAL[i];
                 t.has[i] = AT[i] != 0 && now - AT[i] < STALE_MS;
