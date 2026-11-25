@@ -165,7 +165,21 @@ Build `ttlink` (WSL, toolchain image from [Build and test](Build-and-test.md)):
 wsl -d Ubuntu-24.04 -u root -- sh -c 'cd /mnt/c/.../gauges/headunit && docker run --rm -v "$PWD:/w" -w /w mhi2-qnx65-armv7-public:4.9 arm-unknown-nto-qnx6.5.0eabi-gcc -O2 -std=gnu99 -mfloat-abi=softfp ttlink.c -lsocket -o out/ttlink'
 ```
 
-## Autocross view on the head unit (tt-zoom tele23)
+## Autocross view on the head unit (tt-zoom tele24)
+
+From the car photos and the tele23 render (user 2026-11-24):
+- The rev strip's ends touched the cluster housing: now x 64 and 1376 (were 24 and 1416). The
+  painted strip pictures must be exported again (they follow the geometry).
+- The preset name was flatter than the strip's top edge and close to the frame's top: the strip
+  tapers, so its top edge is steeper than the centre line the text followed (about 20 against 17
+  degrees). Corner texts and icons now take the top edge's angle (edgeAngle) and sit closer to it;
+  the preset starts at 36 % of the slope so it ends before the corner.
+- Themed: a dark plate under the Haldex corner (the portrait sat behind the text and bar), chibis
+  clear of the shift-light rail and the strip, fender arches tight around the measured dials.
+- Haldex page: the gear inside the panel (it crossed its right edge).
+
+### Earlier: tele23
+
 
 **Stock dials measured** (user 2026-11-24: in the themed photos the theme's arches did not sit around
 the dials and the dials covered the panel's edges). Measured on the themed Classic photo with our

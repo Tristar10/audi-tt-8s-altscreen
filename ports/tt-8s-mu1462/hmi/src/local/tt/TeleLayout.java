@@ -154,7 +154,8 @@ public final class TeleLayout {
     // middle up to the shift point, the right slope from the shift point to barToRpm.
     // Middle corners at 720 - 2000 k and 720 + 1800 k (k = the middle's px per rpm): 5000 rpm sits
     // on the screen's centre line x 720, with the gear, shift lights and panel (user 2026-11-24).
-    static final int[] TP_X = {24, 335, 1067, 1416};
+    // tele24: the ends 40 px in from the housing (car photos: both ends touched it)
+    static final int[] TP_X = {64, 335, 1067, 1376};
     // User 2026-11-24: the flat middle fatter (68 px), lower so the shift lights above it can be
     // taller too; everything under the strip moved down by D_Y. The slopes taper from 28 px.
     static final int[] TP_Y = {266, 170, 170, 266};
@@ -449,10 +450,14 @@ public final class TeleLayout {
         // Top-left pocket, along the rising slope: the active OpenHaldex preset, its mode above it,
         // and a Wi-Fi warning only while the link is slow or lost.
         boolean slow = link && rateHz >= 0 && rateHz < 10;
-        double ps = l0 * 0.50; // further along the slope: the theme puts a face in the corner (0.30 before)
-        slopeText(ps, half(ps) + 44 + 0.82 * 32, 32, true, LEFT, link ? PRESET : GREY, presetName(), true);
-        slopeText(ps + 30, half(ps) + 86 + 0.82 * 18, 18, true, LEFT, GREY, presetMode(), true);
-        slopeIcon(l0 * 0.70, half(l0 * 0.70) + 48, 28, TeleIcons.WIFI, AMBER, !link || slow);
+        double ps = l0 * 0.36; // ends before the slope's corner (tele24)
+        // tele24: parallel to the strip's top edge and close to it (car photo: tilted less than the
+        // edge and close to the frame's top)
+        int pl = slopeText(ps, half(ps) + 24 + 0.82 * 30, 30, true, LEFT, link ? PRESET : GREY, presetName(), true);
+        rot[pl] = (float) -edgeAngle();
+        int ml = slopeText(ps + 12, half(ps + 12) + 58 + 0.82 * 16, 16, true, LEFT, GREY, presetMode(), true);
+        rot[ml] = (float) -edgeAngle();
+        slopeIcon(l0 * 0.20, half(l0 * 0.20) + 14, 26, TeleIcons.WIFI, AMBER, !link || slow);
 
         // Top-right pocket, along the falling slope: Haldex lock. Icon and big percent, and under
         // them a bar along the slope with the target as a white tick.
@@ -473,16 +478,20 @@ public final class TeleLayout {
             bandOff(m - 1.5, m + 1.5, half(m) + 30, half(m) + 50, half(m) + 30, half(m) + 50, WHITE,
                 ok(CH_HX_TARGET) && j == ti);
         }
-        slopeIcon(ba + 4, half(ba) + 58, 32, TeleIcons.AWD, ICONC, true);
-        slopeText(ba + 50, half(ba + 50) + 56 + 0.82 * 40, 40, false, LEFT, vc,
+        // dark plate under the Haldex corner while themed (the portrait sits behind it)
+        bandOff(ba - 8, bb + 4, half(ba) + 26, half(ba) + 104, half(bb) + 26, half(bb) + 104, 0x05091CB0, themed);
+        int hi = slopeIcon(ba + 4, half(ba) + 58, 32, TeleIcons.AWD, ICONC, true);
+        rot[hi] = (float) edgeAngle();
+        int hv = slopeText(ba + 50, half(ba + 50) + 56 + 0.82 * 40, 40, false, LEFT, vc,
             ok(CH_HX_ACTUAL) ? percent(act) : "-", true);
+        rot[hv] = (float) edgeAngle();
 
         if (hxPage) {
             // car sideways, nose to the right; gauge and stats to its right; the gear small in the corner
             drivetrain(366, 230, 400, 196, true);
             lockRing(866, 316, 62, 16);
             hxStats(948, 238, 1074);
-            gearGlyph(1082, 236, 44, gc);
+            gearGlyph(1056, 392, 32, gc); // tele24: inside the panel (crossed its right edge)
             return;
         }
         // Left of the notch: rpm, and the driver's inputs under it: accelerator (green) and brake
@@ -661,8 +670,14 @@ public final class TeleLayout {
         return redlineRpm + (int) ((barToRpm - redlineRpm) * (s - l0 - l1) / l2);
     }
 
+    /** The angle of the strip's top edge on a slope, in degrees (it tapers: steeper than the centre). */
+    private static double edgeAngle() {
+        double dy = (TP_Y[0] - TP_Y[1]) + (HALF_MAX - HALF_MIN);
+        return Math.toDegrees(Math.atan2(dy, TP_X[1] - TP_X[0]));
+    }
+
     /** Text along the strip at length s, its top edge offTop px out from the centre (negative: in). */
-    private void slopeText(double s, double offTop, int sz, boolean b, int al, int c, String str, boolean v) {
+    private int slopeText(double s, double offTop, int sz, boolean b, int al, int c, String str, boolean v) {
         tp(s, pa);
         int i = add(TEXT, rd(pa[0] + pa[2] * offTop), rd(pa[1] + pa[3] * offTop), 0, sz, c, v && str != null);
         size[i] = sz;
@@ -670,15 +685,17 @@ public final class TeleLayout {
         align[i] = al;
         text[i] = str;
         rot[i] = (float) Math.toDegrees(Math.atan2(pa[2], -pa[3]));
+        return i;
     }
 
     /** Icon standing on the strip at length s, its bottom edge off px out from the centre. */
-    private void slopeIcon(double s, double off, int px, int id, int c, boolean v) {
+    private int slopeIcon(double s, double off, int px, int id, int c, boolean v) {
         tp(s, pa);
         double out = off + px;
         int i = add(ICON, rd(pa[0] + pa[2] * out), rd(pa[1] + pa[3] * out), px, px, c, v);
         size[i] = id;
         rot[i] = (float) Math.toDegrees(Math.atan2(pa[2], -pa[3]));
+        return i;
     }
 
     static double segLen(int k) {
