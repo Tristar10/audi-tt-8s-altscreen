@@ -293,7 +293,7 @@ public final class TeleLayout {
         int lgap = 6;
         int lw = ((lx1 - lx0 - mid) / 2 - (LEDS_SIDE - 1) * lgap) / LEDS_SIDE;
         int lh = 26;
-        int ly = 102;
+        int ly = 106; // clear of the tab bar notch (the user's clipping guide)
         int sk = 8;
         for (int side = 0; side < 2; side++) {
             for (int i = 0; i < LEDS_SIDE; i++) {
